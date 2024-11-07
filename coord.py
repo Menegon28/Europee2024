@@ -1,7 +1,7 @@
 import polars as pl
 from voti_tidy import votiPerc
 
-cities = pl.read_csv("cities_coord.csv")
+cities = pl.read_csv("cities_coord2.csv")
 
 coord = (cities.select(["name","location"])
          .with_columns(
@@ -11,6 +11,7 @@ coord = (cities.select(["name","location"])
     .drop("__type").sort("name"))
 
 votiCoord = votiPerc.join(coord, left_on="COMUNE", right_on="name")
+votiCoord.glimpse()
 
 partitiPerc = [
     "FRATELLI D'ITALIA (%)",
@@ -30,15 +31,11 @@ partitiPerc = [
     "RASSEMBLEMENT VALDÔTAIN (%)"
 ]
 
-
-
-
-
-
-
 if __name__ == "__main__":
     cities.glimpse()
     print(cities)
     print(coord)
     print(votiCoord)
     votiCoord.glimpse()
+    with pl.Config(tbl_rows=30):
+        print(votiPerc.join(coord, left_on="COMUNE", right_on="name", how="anti").sort("ELETTORI", descending=True))

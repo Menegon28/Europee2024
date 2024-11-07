@@ -49,7 +49,7 @@ votiAbs: pl.DataFrame = (voti.pivot(on="DESCLISTA", values="NUMVOTI")
     VOTI_VALIDI = pl.sum_horizontal(partiti)
 ))
 
-votiPerc: pl.DataFrame = votiAbs.select(["CIRCOSCRIZIONE", "REGIONE", "PROVINCIA", "COMUNE"])
+votiPerc: pl.DataFrame = votiAbs.select(["CIRCOSCRIZIONE", "REGIONE", "PROVINCIA", "COMUNE", "ELETTORI"])
 
 # Add percentage columns for each party by dividing the party votes by VOTI_VALIDI and multiplying by 100
 for partito in partiti:

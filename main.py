@@ -24,7 +24,12 @@ else:
     st.map(votiCoordFilter,
            latitude="latitude",
            longitude="longitude")
-    st.write("Elenco dei comuni corrispondenti e corrispondente percentuale dei voti di ogni partito")
+    st.write("Elenco dei comuni corrispondenti e percentuale dei voti di ogni partito")
     st.write(votiCoordFilter.drop(["latitude", "longitude"]))
 
-
+st.write("__Nota metodologica__: Questa mappa è stata realizzata tramite un _inner join_ tra i dati dei risultati elettorali e "
+         "di un database contenente i valori di latitudine e longitudine di (quasi) tutti i comuni italiani. "
+         "Come è naturale, questo ha comportato una perdita di informazioni dovuta a qualche differenza nei nomi "
+         "come indicati nelle due tabelle. Si sono apportate alcune correzioni di base (e.g. accenti) "
+         "e si è proceduto manualmente per i comuni più grandi. Al momento, circa 600 comuni non sono riportati, "
+         "tutti al di sotto dei 20 mila elettori totali.")
