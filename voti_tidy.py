@@ -2,12 +2,8 @@ import polars as pl
 
 file = "Europee2024.txt"
 voti = pl.read_csv(file, separator=";")
-# vediamo com'è la tabella
-pl.Config.set_tbl_width_chars(300)
-pl.Config(tbl_cols=30)
-# print(voti)
 
-# togliamo una colonna inutile
+# togliamo una colonna inutile e rinominiamo per semplificarci la vita
 voti: pl.DataFrame = (voti
                       .drop("DATA_ELEZIONE")
                       .rename({
@@ -16,8 +12,6 @@ voti: pl.DataFrame = (voti
     "DESCPROVINCIA"     : "PROVINCIA",
     "DESCCOMUNE"        : "COMUNE"
 }))
-
-
 
 # vediamo che ci sono 7896 comuni e 15 partiti totali, non tutti presenti in ogni circoscrizione
 # notiamo la differenza tra un valone null, che indica che il partito non era candidato in quel comune
@@ -49,7 +43,7 @@ votiAbs: pl.DataFrame = (voti.pivot(on="DESCLISTA", values="NUMVOTI")
     VOTI_VALIDI = pl.sum_horizontal(partiti)
 ))
 
-votiPerc: pl.DataFrame = votiAbs.select(["CIRCOSCRIZIONE", "REGIONE", "PROVINCIA", "COMUNE", "ELETTORI"])
+votiPerc: pl.DataFrame = votiAbs.select(["CIRCOSCRIZIONE", "REGIONE", "PROVINCIA", "COMUNE", "ELETTORI", "ELETTORI_M"])
 
 # Add percentage columns for each party by dividing the party votes by VOTI_VALIDI and multiplying by 100
 for partito in partiti:
@@ -59,14 +53,10 @@ for partito in partiti:
 
 
 if __name__ == "__main__":
-    print(votiAbs)
-
-    votiAbs.glimpse()
-    print(votiAbs)
-    print(votiAbs.null_count())
-    # non sono candidati ovunque: RV, SVP, DemSovrPop, Animalisti/Italexit
-
-    # totali per colonna
-    print(votiAbs.sum())
-    votiPerc.glimpse()
+    pl.Config.set_tbl_width_chars(200)
+    pl.Config(tbl_cols=20)
     print(votiPerc)
+    print(votiPerc.filter(pl.col("ALLEANZA VERDI E SINISTRA") == pl.max("ALLEANZA VERDI E SINISTRA")))
+    votiPerc.write_csv("VotiPerc_R.csv")
+    votiAbs.write_csv("VotiAbs_R.csv")
+
