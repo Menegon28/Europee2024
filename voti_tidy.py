@@ -1,4 +1,5 @@
 import polars as pl
+from fontTools.misc.psOperators import ps_array
 
 file = "Europee2024.txt"
 voti = pl.read_csv(file, separator=";")
@@ -35,12 +36,18 @@ partiti = [
     "PARTITO ANIMALISTA - ITALEXIT PER L'ITALIA",
     "RASSEMBLEMENT VALDÔTAIN"
 ]
+
+
+# partiti = voti.select("DESCLISTA").unique().to_struct().to_list()
+# print("___________")
+# print(partiti)
+# print(type(partiti))
 # votiAbs: pl.DataFrame = (voti.pivot(on="DESCLISTA", values="NUMVOTI"))
 # print(votiAbs)
 # se voglianmo che ogni comune appaia una sola volta
 votiAbs: pl.DataFrame = (voti.pivot(on="DESCLISTA", values="NUMVOTI")
                          .with_columns(
-    VOTI_VALIDI = pl.sum_horizontal(partiti)
+    VOTI_VALIDI=pl.sum_horizontal(partiti)
 ))
 
 votiPerc: pl.DataFrame = votiAbs.select(["CIRCOSCRIZIONE", "REGIONE", "PROVINCIA", "COMUNE", "ELETTORI", "ELETTORI_M"])
@@ -59,4 +66,5 @@ if __name__ == "__main__":
     print(votiPerc.filter(pl.col("ALLEANZA VERDI E SINISTRA") == pl.max("ALLEANZA VERDI E SINISTRA")))
     votiPerc.write_csv("VotiPerc_R.csv")
     votiAbs.write_csv("VotiAbs_R.csv")
+    voti.glimpse()
 
