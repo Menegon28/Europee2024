@@ -9,7 +9,7 @@ import statsmodels.api as sm
 
 st.write("## Analisi iniziale")
 st.write("Inizialmente la tabella appare nel formato seguente (riportiamo le prime righe): ")
-st.write(vt.voti.head(24))
+st.write(vt.get_raw_data().head(24))
 
 st.write("### Mappe dei risultati")
 st.write("Dall'interfaccia, selezionare un __partito__ e un __intervallo della percentuale di voti__. "
@@ -21,7 +21,7 @@ partitoMappa = st.selectbox("Partito", vt.partiti, key="mappa")
 (minPerc, maxPerc) = st.slider("Seleziona l'intevallo percentuale", 0, 100, value=(0, 100))
 
 votiCoordFilter = (coord.votiCoord
-                   .drop("CIRCOSCRIZIONE")
+                   .drop(["CIRCOSCRIZIONE", "ELETTORI_M"])
                    .filter(pl.col(partitoMappa) >= minPerc)
                    .filter(pl.col(partitoMappa) <= maxPerc)
                    .sort(["REGIONE", "PROVINCIA", "COMUNE"]))
