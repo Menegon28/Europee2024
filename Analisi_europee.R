@@ -13,6 +13,14 @@ glm.1 <- glm(y ~ ELETTORI, family=binomial, weights=ELETTORI)
 summary(glm.1)
 logitc
 
+
+
+
+
+
+
+
+
 detach()
 
 

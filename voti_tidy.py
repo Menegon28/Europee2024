@@ -21,10 +21,7 @@ def get_raw_data():
     return voti
 
 
-# vediamo che ci sono 7896 comuni e 15 partiti totali, non tutti presenti in ogni circoscrizione
-# notiamo la differenza tra un valone null, che indica che il partito non era candidato in quel comune
-# (perché non si è candidato in quella circoscrizione)
-# e il valore 0 che indica che il partito non ha raccolto voti nel comune indicato (ma era candidato)
+
 
 
 @st.cache_data
@@ -42,8 +39,13 @@ def data_preprocessing():
         ["CIRCOSCRIZIONE", "REGIONE", "PROVINCIA", "COMUNE", "ELETTORI", "ELETTORI_M"])
     # crea il dataframe votiPerc aggiungendo alle colonne delle caratteristiche dei comuni le percentuali di ogni partito
     for partito in partiti:
-        Perc = Perc.with_columns([
-            (Abs[partito] / Abs["VOTI_VALIDI"] * 100).round(2).alias(partito)])  # da rivedere rounding
+        Perc = Perc.with_columns(
+            [(Abs[partito] / Abs["VOTI_VALIDI"] * 100).round(2).alias(partito)]
+        )  # da rivedere rounding
+    Perc = Perc.with_columns(
+        CENTRODESTRA=Perc["FRATELLI D'ITALIA"] + Perc["LEGA SALVINI PREMIER"] + Perc["FORZA ITALIA - NOI MODERATI - PPE"],
+        CENTROSINISTRA=Perc["PARTITO DEMOCRATICO"] + Perc["MOVIMENTO 5 STELLE"] + Perc["ALLEANZA VERDI E SINISTRA"]
+    )
     return Abs, Perc
 
 
@@ -65,16 +67,21 @@ partiti = [
     "RASSEMBLEMENT VALDÔTAIN"
 ]
 
+partiti_ext = partiti + ["CENTRODESTRA", "CENTROSINISTRA"]
+
+# dati iniziali già preprocessati
 votiAbs, votiPerc = data_preprocessing()
+
 
 if __name__ == "__main__":
     pl.Config.set_tbl_width_chars(200)
-    pl.Config(tbl_cols=20)
+    pl.Config(tbl_cols=30)
     print("VOTI:")
     print(get_raw_data())
-    print("-" * 20)
-    print("votiABS:")
-    print(votiAbs)
-    print("-" * 20)
-    print("votiPERC:")
     print(votiPerc)
+    # print("-" * 20)
+    # print("votiABS:")
+    # print(votiAbs)
+    # print("-" * 20)
+    # print("votiPERC:")
+    # print(votiPerc)
