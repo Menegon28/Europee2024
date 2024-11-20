@@ -28,24 +28,45 @@ partitoPop = st.selectbox("Partito", vt.partiti_ext, key="scatter")
 st.write("### Scatterplot log(numero di elettori) - share di voto")
 
 # aggiungiamo una colonna log(ELETTORI) per usarla come esplicativa di un modello lineare
-votiPercPlot = vt.votiPerc.with_columns(logELETTORI=pl.col("ELETTORI").log())
-scatter1 = px.scatter(votiPercPlot, x="logELETTORI", y=partitoPop, trendline="ols", trendline_color_override='red')
-st.plotly_chart(scatter1)
+votiPercPlot = vt.votiPerc.with_columns(
+    logELETTORI=pl.col("ELETTORI").log(),
+    M_PERC=pl.col("ELETTORI_M")/pl.col("ELETTORI")
+)
 
-# scatter_alt = alt.Chart(votiPercPlot, height=460, width=720).mark_circle(size=60).encode(
-#     x="logELETTORI:Q",
-#     y=f"FRATELLI D'ITALIA:Q",
-# )
-# st.write(scatter_alt)
-
-# per ricavare R^2, p-value e coeff. angolare sviluppiamo un vero e proprio modello lineare, in modo da replicare
-# dei risultati che sarebbero facilmente ottenibili in R
+# creiamo il modello
 logEl = sm.add_constant(votiPercPlot["logELETTORI"].to_list())
 voteShare = votiPercPlot[partitoPop].to_list()
-model = sm.OLS(voteShare, logEl).fit()
-st.write(f"R^2: {model.rsquared:.3f}")
-st.write(f"p-value della variabile esplicativa logElettori: {model.pvalues[1]}")
-st.write(f"Coefficiente angolare: {model.params[1]:.3f}")
+modelPop = sm.OLS(voteShare, logEl).fit()
+
+votiPercPlot = votiPercPlot.with_columns(
+    prev=modelPop.predict(logEl)
+)
+
+basePop = (
+    alt.Chart(votiPercPlot)
+    .mark_circle()
+    .encode(
+        alt.X("ELETTORI", scale=alt.Scale(type='log'), axis=alt.Axis(title="Numero di elettori")),
+        # altair ha bisogno di escapare le quotes altrimenti panica (closed issue 888), dunque sostiamo direttamente qua
+        alt.Y(partitoPop.replace("'", "\\'"), axis=alt.Axis(title=f"% di {partitoPop.title()}"))
+    )
+)
+
+trendPop = (alt.Chart(votiPercPlot)
+             .mark_line(color="red")
+             .encode(
+    alt.X("ELETTORI", scale=alt.Scale(type="log")),
+    alt.Y("prev")
+)
+)
+
+popPlot = (basePop + trendPop)
+st.altair_chart(popPlot, use_container_width=True)
+
+
+st.write(f"R^2: {modelPop.rsquared:.3f}")
+st.write(f"p-value della variabile esplicativa logElettori: {modelPop.pvalues[1]}")
+st.write(f"Coefficiente angolare: {modelPop.params[1]:.3f}")
 
 st.write("Per i partiti maggiori, la correlazione è significativa per tutti tranne Forza Italia, con p-values che "
          "permettono di rifiutare l'ipotesi nulla di incorrelazione tra media e percentuali di voto senza dubbio.")
@@ -53,16 +74,41 @@ st.write("Inoltre, notiamo che la correlazione è positiva per i partiti di cent
          "per PD e M5S, ma anche per AVS, AZ, SUE, mentre è negativa per i partiti di centrodestra, ovvero Lega e FdI. "
          "La non significatività per FI è del tutto particolare.")
 
+########################
 st.write("### Scatterplot percentuale di elettori maschi - share di voto")
-scatter2 = px.scatter((vt.votiPerc
-                       .with_columns(M_PERC=pl.col("ELETTORI_M")/pl.col("ELETTORI"))),
-                      x="M_PERC", y=partitoPop, trendline="ols", trendline_color_override='red', marginal_x="violin")
-st.plotly_chart(scatter2)
 
-# st.write("----------------------------")
-# glm_model = smf.glm(formula="FRATELLI D'ITALIA ~ M_PERC", data=vt.votiPerc, family=sm.families.Binomial())
-# glm_results = glm_model.fit()
-# st.write(glm_results.summary())
+# creiamo il modello
+MPerc = sm.add_constant(votiPercPlot["M_PERC"].to_list())
+modelPop = sm.OLS(voteShare, MPerc).fit()
+
+votiPercPlot = votiPercPlot.with_columns(
+    prev=modelPop.predict(MPerc)
+)
+
+baseSex = (
+    alt.Chart(votiPercPlot)
+    .mark_circle()
+    .encode(
+        alt.X("M_PERC", axis=alt.Axis(title="Percentuale di elettori maschi"),
+              # per qualche motivo il default del range non è (min,max) quindi imponiamolo
+              scale=alt.Scale(domain=[votiPercPlot["M_PERC"].min(), votiPercPlot["M_PERC"].max()])),
+        # altair ha bisogno di escapare le quotes altrimenti panica (closed issue 888), dunque sostiamo direttamente qua
+        alt.Y(partitoPop.replace("'", "\\'"), axis=alt.Axis(title=f"% di {partitoPop.title()}")),
+        alt.Size("ELETTORI")
+    )
+)
+
+trendSex = (alt.Chart(votiPercPlot)
+            .mark_line(color="red")
+            .encode(
+    alt.X("M_PERC"),
+    alt.Y("prev")
+)
+)
+
+sexPlot = (baseSex + trendSex)
+st.altair_chart(sexPlot, use_container_width=True)
+
 
 
 st.write("### Test di normalità")
