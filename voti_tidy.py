@@ -10,14 +10,17 @@ def get_raw_data():
     # togliamo una colonna inutile e rinominiamo per semplificarci la vita
     # questo sarà il dataframe che rappresenta l'linformazione iniziale "raw"
     # indico il tipo atteso altrimenti pycharm si confonde
-    voti: pl.dataframe = (voti
-    .drop("DATA_ELEZIONE")
-    .rename({
-        "DESCCIRCEUROPEA": "CIRCOSCRIZIONE",
-        "DESCREGIONE": "REGIONE",
-        "DESCPROVINCIA": "PROVINCIA",
-        "DESCCOMUNE": "COMUNE"
-    }))
+    voti: pl.dataframe = (
+        voti
+        .drop("DATA_ELEZIONE")
+        .rename({
+            "DESCCIRCEUROPEA": "CIRCOSCRIZIONE",
+            "DESCREGIONE": "REGIONE",
+            "DESCPROVINCIA": "PROVINCIA",
+            "DESCCOMUNE": "COMUNE"
+        }
+        )
+    )
     return voti
 
 
@@ -79,6 +82,7 @@ if __name__ == "__main__":
     print("VOTI:")
     print(get_raw_data())
     print(votiPerc)
+    print(votiPerc["PARTITO DEMOCRATICO"])
     # print("-" * 20)
     # print("votiABS:")
     # print(votiAbs)

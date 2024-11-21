@@ -89,9 +89,7 @@ baseSex = (
     alt.Chart(votiPercPlot)
     .mark_circle()
     .encode(
-        alt.X("M_PERC", axis=alt.Axis(title="Percentuale di elettori maschi"),
-              # per qualche motivo il default del range non è (min,max) quindi imponiamolo
-              scale=alt.Scale(domain=[votiPercPlot["M_PERC"].min(), votiPercPlot["M_PERC"].max()])),
+        alt.X("M_PERC", axis=alt.Axis(title="Percentuale di elettori maschi")).scale(zero=False),
         # altair ha bisogno di escapare le quotes altrimenti panica (closed issue 888), dunque sostiamo direttamente qua
         alt.Y(partitoPop.replace("'", "\\'"), axis=alt.Axis(title=f"% di {partitoPop.title()}")),
         alt.Size("ELETTORI")
@@ -112,11 +110,71 @@ st.altair_chart(sexPlot, use_container_width=True)
 
 
 st.write("### Test di normalità")
-partitoDistr = st.selectbox("Partito", vt.partiti, key="distr")
+regioni = sorted(votiPercPlot["REGIONE"].unique().to_list())
+partitoDistr = st.selectbox("Partito", ["ITALIA"] + regioni, key="distr")
 
-hist_data = vt.votiPerc[partitoDistr].drop_nulls().to_list()
-distr = ff.create_distplot([hist_data], ["Densità"], curve_type="normal")
-st.plotly_chart(distr)
+# hist_data = vt.votiPerc[partitoDistr].drop_nulls().to_list()
+# distr = ff.create_distplot([hist_data], ["Densità"], curve_type="normal")
+# st.plotly_chart(distr)
+
+
+partitiPlot = [
+        "FRATELLI D'ITALIA",
+        "PARTITO DEMOCRATICO",
+        "MOVIMENTO 5 STELLE",
+        "FORZA ITALIA - NOI MODERATI - PPE",
+        "LEGA SALVINI PREMIER",
+        "ALLEANZA VERDI E SINISTRA",
+        "STATI UNITI D'EUROPA",
+        "AZIONE - SIAMO EUROPEI"
+    ]
+votiPercPlot = (
+    votiPercPlot.select(
+        ["REGIONE", "COMUNE"] + partitiPlot
+    ).unpivot(
+        on=partitiPlot,
+        index=["REGIONE", "COMUNE"],
+        variable_name="LISTA",
+        value_name="VOTI"
+    ).filter(
+        pl.col("LISTA").is_in(partitiPlot)
+    )
+)
+
+if partitoDistr != "ITALIA":
+    votiPercPlot = votiPercPlot.filter(pl.col("REGIONE") == partitoDistr)
+
+distrChart = (
+    alt.Chart(votiPercPlot)
+    .transform_density(
+        density="VOTI",
+        groupby=["LISTA"],
+        as_=["VOTI", "density"]
+    ).mark_area(
+        opacity=0.7
+    ).encode(
+        alt.X("VOTI:Q", title="Percentuale di voto", scale=alt.Scale(domain=[0, 60])),
+        alt.Y("density:Q", title="Densità", scale=alt.Scale(domain=[0, 0.3])),
+        alt.Row("LISTA:N", title=None, sort=partitiPlot),
+        alt.Color("LISTA:N", legend=alt.Legend(orient="none", legendY=650))
+    ).properties(
+        height=75,
+        bounds="flush"
+    ).configure_facet(
+        spacing=0
+    ).configure_view(
+        stroke=None
+    ).configure_title(
+        anchor="end"
+    )
+)
+
+st.altair_chart(distrChart, use_container_width=True)
+
+
+
+
+
 st.write("Per i dati così come sono, valutando anche i relativi qqplot in R, rifiutiamo l'ipotesi di "
          "normalità dei dati per quasi tutti i partiti. Ciò è anche dovuto alla presenza di outlier forti rispetto "
          "a media e varianza stimate delle variabili. Inoltre, il supporto qui considerato è l'intervallo [0, 100], "
