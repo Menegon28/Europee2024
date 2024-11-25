@@ -1,8 +1,10 @@
 import polars as pl
-from voti_tidy import votiPerc
+import altair as alt
 import streamlit as st
+from voti_tidy import votiPerc
 
 
+@st.cache_data
 def coord_preprocessing():
     cities = pl.read_csv("cities_coord_original.csv")
 
@@ -33,7 +35,7 @@ def coord_preprocessing():
     processed.write_csv("cities_coord_prepr.csv")
 
 
-# @st.cache_data
+@st.cache_data
 def get_coord():
     cities = pl.read_csv("cities_coord_prepr.csv")
 
@@ -52,12 +54,26 @@ def get_coord():
     return votiPerc.join(coord, left_on="COMUNE", right_on="name")
 
 
+@st.cache_data
+def get_topo_data(livello):
+    if livello == "REGIONE":
+        geo = alt.topo_feature(
+            "https://raw.githubusercontent.com/openpolis/geojson-italy/master/topojson/limits_IT_regions.topo.json",
+            "regions")
+        label = "properties.reg_name"
+    else:  # elif chLiv == "COMUNE":
+        geo = alt.topo_feature(
+            "https://raw.githubusercontent.com/openpolis/geojson-italy/master/topojson/limits_IT_provinces.topo.json",
+            "provinces")
+        label = "properties.prov_name"
+    return geo, label
+
 coord_preprocessing()
 votiCoord = get_coord()
 
 
 if __name__ == "__main__":
-    # votiCoord.glimpse()
     pass
+
 
 

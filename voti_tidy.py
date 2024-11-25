@@ -24,18 +24,17 @@ def get_raw_data():
     return voti
 
 
-
-
-
 @st.cache_data
 def data_preprocessing():
     voti = get_raw_data()
 
     # effettuamo un pivot per rendere il singolo comune l'unità statistica e il numero di voti di ogni lista una variabile
-    Abs: pl.DataFrame = (voti.pivot(on="DESCLISTA", values="NUMVOTI")
-    .with_columns(
-        VOTI_VALIDI=pl.sum_horizontal(partiti)
-    ))
+    Abs: pl.DataFrame = (
+        voti.pivot(on="DESCLISTA", values="NUMVOTI")
+        .with_columns(
+            VOTI_VALIDI=pl.sum_horizontal(partiti)
+        )
+    )
 
     # inizializzia il dataframe per le percentuali di voto per partito
     Perc: pl.DataFrame = Abs.select(
