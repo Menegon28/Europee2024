@@ -32,14 +32,15 @@ def coord_preprocessing():
     )
     # with pl.Config(tbl_rows=50):
     #     print(processed.select("name"))
-    processed.write_csv("cities_coord_prepr.csv")
+    # processed.write_csv("cities_coord_prepr.csv")
+    return processed
 
 
 @st.cache_data
-def get_coord():
-    cities = pl.read_csv("cities_coord_prepr.csv")
+def get_coord(_data):
+    # cities = pl.read_csv("cities_coord_prepr.csv")
 
-    coord = (cities.select(["name", "location"])
+    coord = (_data.select(["name", "location"])
              .with_columns(
         pl.col("location").str.json_decode(),
         pl.col("name").str.to_uppercase()
@@ -68,8 +69,28 @@ def get_topo_data(livello):
         label = "properties.prov_name"
     return geo, label
 
-coord_preprocessing()
-votiCoord = get_coord()
+def reg_prov_fix(voti):
+    voti = (
+        voti
+        .with_columns(
+            pl.col("REGIONE")
+            .str.replace("Trentino-Alto Adige", "Trentino-Alto Adige/Südtirol")
+            .str.replace("Valle D'Aosta", "Valle d'Aosta/Vallée d'Aoste"),
+            pl.col("PROVINCIA")
+            .str.replace("Monza E Della Brianza", "Monza e della Brianza")
+            .str.replace("Reggio Nell' Emilia", "Reggio nell'Emilia")
+            .str.replace("Forli'-Cesena", "Forlì-Cesena")
+            .str.replace("Pesaro E Urbino", "Pesaro e Urbino")
+            .str.replace("Reggio Calabria", "Reggio di Calabria")
+            .str.replace("Aosta", "Valle d'Aosta/Vallée d'Aoste")
+            .str.replace("Bolzano", "Bolzano/Bozen")
+
+        )
+    )
+    return voti
+
+dataCoord = coord_preprocessing()
+votiCoord = get_coord(dataCoord)
 
 
 if __name__ == "__main__":

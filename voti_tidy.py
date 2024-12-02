@@ -17,7 +17,8 @@ def get_raw_data():
             "DESCCIRCEUROPEA": "CIRCOSCRIZIONE",
             "DESCREGIONE": "REGIONE",
             "DESCPROVINCIA": "PROVINCIA",
-            "DESCCOMUNE": "COMUNE"
+            "DESCCOMUNE": "COMUNE",
+            "DESCLISTA": "LISTA"
         }
         )
     )
@@ -29,26 +30,29 @@ def data_preprocessing():
     voti = get_raw_data()
 
     # effettuamo un pivot per rendere il singolo comune l'unità statistica e il numero di voti di ogni lista una variabile
-    Abs: pl.DataFrame = (
-        voti.pivot(on="DESCLISTA", values="NUMVOTI")
+    abs: pl.DataFrame = (
+        voti
+        .pivot(on="LISTA", values="NUMVOTI")
         .with_columns(
             VOTI_VALIDI=pl.sum_horizontal(partiti)
         )
     )
 
-    # inizializzia il dataframe per le percentuali di voto per partito
-    Perc: pl.DataFrame = Abs.select(
-        ["CIRCOSCRIZIONE", "REGIONE", "PROVINCIA", "COMUNE", "ELETTORI", "ELETTORI_M"])
+    # inizializza il dataframe per le percentuali di voto per partito
+    perc: pl.DataFrame = abs.select(
+        ["CIRCOSCRIZIONE", "REGIONE", "PROVINCIA", "COMUNE", "ELETTORI", "ELETTORI_M", "VOTANTI"]
+    )
     # crea il dataframe votiPerc aggiungendo alle colonne delle caratteristiche dei comuni le percentuali di ogni partito
     for partito in partiti:
-        Perc = Perc.with_columns(
-            [(Abs[partito] / Abs["VOTI_VALIDI"] * 100).round(2).alias(partito)]
+        perc = perc.with_columns(
+            [(abs[partito] / abs["VOTI_VALIDI"] * 100).round(2).alias(partito)]  # da risolvere la questione round()
         )  # da rivedere rounding
-    Perc = Perc.with_columns(
-        CENTRODESTRA=Perc["FRATELLI D'ITALIA"] + Perc["LEGA SALVINI PREMIER"] + Perc["FORZA ITALIA - NOI MODERATI - PPE"],
-        CENTROSINISTRA=Perc["PARTITO DEMOCRATICO"] + Perc["MOVIMENTO 5 STELLE"] + Perc["ALLEANZA VERDI E SINISTRA"]
+    perc = perc.with_columns(
+        CENTRODESTRA=pl.col("FRATELLI D'ITALIA") + pl.col("LEGA SALVINI PREMIER") + pl.col("FORZA ITALIA - NOI MODERATI - PPE"),
+        CENTROSINISTRA=pl.col("PARTITO DEMOCRATICO") + pl.col("MOVIMENTO 5 STELLE") + pl.col("ALLEANZA VERDI E SINISTRA"),
+        AFFLUENZA=pl.col("VOTANTI") / pl.col("ELETTORI") * 100
     )
-    return Abs, Perc
+    return abs, perc
 
 
 partiti = [
@@ -71,6 +75,18 @@ partiti = [
 
 partiti_ext = partiti + ["CENTRODESTRA", "CENTROSINISTRA"]
 
+# partiti oltre il 3%
+partitiPlot = [
+    "FRATELLI D'ITALIA",
+    "PARTITO DEMOCRATICO",
+    "MOVIMENTO 5 STELLE",
+    "FORZA ITALIA - NOI MODERATI - PPE",
+    "LEGA SALVINI PREMIER",
+    "ALLEANZA VERDI E SINISTRA",
+    "STATI UNITI D'EUROPA",
+    "AZIONE - SIAMO EUROPEI"
+]
+
 # dati iniziali già preprocessati
 votiAbs, votiPerc = data_preprocessing()
 
@@ -82,9 +98,4 @@ if __name__ == "__main__":
     print(get_raw_data())
     print(votiPerc)
     print(votiPerc["PARTITO DEMOCRATICO"])
-    # print("-" * 20)
-    # print("votiABS:")
-    # print(votiAbs)
-    # print("-" * 20)
-    # print("votiPERC:")
-    # print(votiPerc)
+    get_raw_data().glimpse()
