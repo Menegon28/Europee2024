@@ -5,6 +5,7 @@ import statsmodels.api as sm
 import statsmodels.formula.api as smf
 import voti_tidy as vt
 import mappe
+import modelli as mod
 
 # st.write("votiAbs")
 # st.dataframe(vt.votiAbs)
@@ -20,7 +21,6 @@ gestito dal Ministero dell'Interno.
 Scaricando i dati, otteniamo inizialmente una tabella che appare nel formato seguente (riportiamo le prime righe):
 """
 st.dataframe(vt.get_raw_data().head(4))
-# st.write(vt.get_raw_data().glimpse())
 """
 In questo formato i dati non sono _tidy_. Infatti, vogliamo che l'unità statistica sia il singolo comune
 e il numero di voti di ogni lista sia ognuno una variabile. Pertanto, effettiamo un pivot sulla colonna
@@ -38,8 +38,67 @@ e il valore 0 che indica che il partito non ha raccolto voti nel comune indicato
 Per prima cosa, vediamo cosa i dati ci dicono sui risultati dei singoli partiti. Questi possono essere esplorati
 a livello nazionale, di circoscrizione, regionale, provinciale o comunale.
 """
+circoscrizioni = sorted(vt.votiPerc.get_column("CIRCOSCRIZIONE").unique().to_list())
+df_circ = st.selectbox("Circoscrizione", ["ITALIA"]+circoscrizioni, key="df_circ")
+if df_circ == "ITALIA":
+    votiPercDf = vt.voti_grouped_by("ITALIA")
+else:
+    regioni = sorted(
+        vt.votiPerc
+        .filter(pl.col("CIRCOSCRIZIONE") == df_circ)
+        .get_column("REGIONE")
+        .unique().to_list())
+    df_reg = st.selectbox("Regione", ["TUTTE"] + regioni, key="df_reg")
+
+    if df_reg == "TUTTE":
+        votiPercDf = vt.voti_grouped_by("CIRCOSCRIZIONE", df_circ)
+    else:
+        province = sorted(
+            vt.votiPerc
+            .filter(pl.col("REGIONE") == df_reg)
+            .get_column("PROVINCIA")
+            .unique().to_list())
+        df_prov = st.selectbox("Provincia", ["TUTTE"] + province, key="df_prov")
+
+        if df_prov == "TUTTE":
+            votiPercDf = vt.voti_grouped_by("REGIONE", df_reg)
+        else:
+            comuni = sorted(
+                vt.votiPerc
+                .filter(pl.col("PROVINCIA") == df_prov)
+                .get_column("COMUNE")
+                .unique().to_list())
+            df_com = st.selectbox("Comune", ["TUTTI"] + comuni, key="df_com")
+
+            if df_com == "TUTTI":
+                votiPercDf = vt.voti_grouped_by("PROVINCIA", df_prov)
+            else:
+                votiPercDf = vt.votiPerc.filter(pl.col("COMUNE") == df_com)
+
+votiPercDf = (
+    votiPercDf
+    .unpivot(
+        on=vt.partiti,
+        variable_name="LISTA",
+        value_name="PERC"
+    )
+    .filter(
+        pl.col("PERC").is_not_null()
+    )
+)
+
+bar_chart = (
+    alt.Chart(votiPercDf)
+    .mark_bar()
+    .encode(
+        alt.X("PERC"),
+        alt.Y("LISTA", sort="-x")
+    )
+)
+
+st.altair_chart(bar_chart, use_container_width=True)
 st.write("### Ridgeline plot")
-regioni = sorted(vt.votiPerc["REGIONE"].unique().to_list())
+regioni = sorted(vt.votiPerc.get_column("REGIONE").unique().to_list())
 partitoDistr = st.selectbox("Ripartizione geografica", ["ITALIA"] + regioni, key="distr")
 
 # usiamo votiPercPlot come dataframe temporaneo, da manipolare di volta in volta per creare i singoli grafici
@@ -72,25 +131,34 @@ distrChart = (
         opacity=0.7
     ).encode(
         alt.X("VOTI:Q", title="Percentuale di voto", scale=alt.Scale(domain=[0, 60])),
-        alt.Y("density:Q", title="Densità", scale=alt.Scale(domain=[0, 0.3])),
-        alt.Row("LISTA:N", title=None, sort=vt.partitiPlot),
-        alt.Color("LISTA:N", scale=alt.Scale(domain=vt.partitiPlot), legend=alt.Legend(orient="none", legendX=720))
+        alt.Y("density:Q", title=None, axis=None, scale=alt.Scale(domain=[0, 0.3])),
+        alt.Row("LISTA:N", title=None, sort=vt.partitiPlot, header=alt.Header(labelAngle=0, labelAlign="left")),
+        # alt.Facet("LISTA:N", title=None, sort=vt.partitiPlot, header=alt.Header(labelAlign='left')),
+        alt.Color("LISTA:N", scale=alt.Scale(domain=vt.partitiPlot,range=vt.colors))  # legend=alt.Legend(orient="none", legendX=720)
     ).properties(
         height=75,
         bounds="flush"
-    ).configure_facet(
-        spacing=0
-    ).configure_view(
-        stroke=None
-    ).configure_title(
-        anchor="end"
     )
 )
 
 st.altair_chart(distrChart, use_container_width=True)
+"""
+Ad essere rigorosi, per i dati così presentati, valutando anche i relativi qqplot in R, rifiutiamo l'ipotesi di normalità per quasi 
+tutti i partiti. Ciò è principalmente dovuto alla presenza di outlier forti rispetto a media e varianza stimate delle variabili. 
+Inoltre, il supporto qui considerato è l'intervallo [0, 100], dunque difficilmente compatibile con una distribuzione normale per medie 
+vicine ad uno degli estremi. Si noti a questo proposito che la distribuzione più vicina ad una normale è quella di 
+Fratelli d'Italia: ciò è dovuto al fatto che la media della variabile è ragionevolmente vicina al centro dell'intervallo.
+
+Ciò detto, al netto delle code la normalità approssimata è una assunzione plausibile, come si può ben vedere dall'andamento
+a gaussiana delle distribuzioni.
+"""
 
 ### scatterplots a 2 vabiabili
-st.write("## Alcune ipotesi di ricerca")
+"""
+## Alcune ipotesi di ricerca
+
+Analizziamo il rapporto tra alcune variabili e la percentuale di voto partito per parito
+"""
 # slider per gli scatterplot
 partitoPop = st.selectbox("Partito di cui mostrare i grafici:", vt.partiti_ext, key="scatter")
 
@@ -100,67 +168,57 @@ votiPercPlot = vt.votiPerc.with_columns(
     M_PERC=pl.col("ELETTORI_M") / pl.col("ELETTORI") * 100
 )
 
-def make_model_graph(var: str, log: bool, size: bool, title: str):
-    intercept = sm.add_constant(votiPercPlot.get_column(f"log{var}" if log else var).to_list())
-    vote_share = votiPercPlot.get_column(partitoPop).to_list()
-    model = sm.OLS(vote_share, intercept).fit()
 
-    plot_prev = votiPercPlot.with_columns(
-        prev=model.predict(intercept)
-    )
-
-    base = (
-        alt.Chart(plot_prev)
-        .mark_circle()
-        .encode(
-            alt.X(var, scale=alt.Scale(type='log') if log else alt.Scale(type="linear",zero=False),
-                  axis=alt.Axis(title=title)),
-            # altair ha bisogno di escapare le quotes altrimenti panica (closed issue 888), dunque sostiamo direttamente qua
-            alt.Y(partitoPop.replace("'", "\\'"), axis=alt.Axis(title=f"% di {partitoPop.title()}")),
-        alt.Size("ELETTORI") if size else alt.Size()
-        )
-    )
-
-    trend = (
-        alt.Chart(plot_prev)
-        .mark_line(color="red")
-        .encode(
-            alt.X(var, scale=alt.Scale(type="log")) if log else alt.X(var),
-            alt.Y("prev")
-        )
-    )
-
-    st.altair_chart(base + trend, use_container_width=True)
-    st.latex(
-        rf"""
-        R^2: {model.rsquared:.3f} \quad
-        p\text{{-value dell'esplicativa: }} {model.pvalues[1]:.2e} \quad
-        \text{{coeff. angolare: }} {model.params[1]:.2f} 
-        """
-    )
 
 st.write("### Scatterplot log(numero di elettori) - share di voto")
-make_model_graph("ELETTORI", True, False,f"% di {partitoPop.title()}")
+mod.make_model_graph("ELETTORI", True, False,f"% di {partitoPop.title()}", partitoPop)
 st.write("### Scatterplot percentuale di elettori maschi - share di voto")
-make_model_graph("M_PERC", False, True,"Percentuale di elettori maschi")
+mod.make_model_graph("M_PERC", False, True,"Percentuale di elettori maschi", partitoPop)
 st.write("### Scatterplot affluenza - share di voto")
-make_model_graph("AFFLUENZA", False, True, "Affluenza percentuale")
-
+mod.make_model_graph("AFFLUENZA", False, True, "Affluenza percentuale", partitoPop)
 # da sistemare
 """
-Per i partiti maggiori, la correlazione è significativa per tutti tranne Forza Italia, con p-values che 
-permettono di rifiutare l'ipotesi nulla di incorrelazione tra media e percentuali di voto senza dubbio.
-Inoltre, notiamo che la correlazione è positiva per i partiti di centro e centrosinistra, in particolare 
-per PD e M5S, ma anche per AVS, AZ, SUE, mentre è negativa per i partiti di centrodestra, ovvero Lega e FdI. 
-La non significatività per FI è del tutto particolare.
+In generale, notiamo che i partiti di centrodestra ottengono risultati migliori nei comuni meno popolosi, 
+con percentuali di elettori maschi alte e affluenza alta. I trend di Fratelli d'Italia e Lega si assomigliano abbastanza,
+mentre quello di Forza Italia non segue l'andamento del resto della coalizione. In particolare, la grandezza
+del comune non appare significativa, e i trend per le altre due esplicative vanno in direzione opposta (benché debolmente)
+a quanto visto per Lega e FdI. Si potrebbe ipotizzare che tale comportamento sia dovuto al fatto che Forza Italia, seguendo
+politiche più centriste, faccia riferimento ad un elettorato con caratteristiche diverse.
 
-Per i dati così come sono, valutando anche i relativi qqplot in R, rifiutiamo l'ipotesi di normalità dei dati per quasi 
-tutti i partiti. Ciò è anche dovuto alla presenza di outlier forti rispetto a media e varianza stimate delle variabili. 
-Inoltre, il supporto qui considerato è l'intervallo [0, 100], dunque incompatibile con una distribuzione normale per medie 
-vicine ad uno degli estremi. Si noti a questo proposito che la distribuzione più vicina ad una normale è quella di 
-Fratelli d'Italia: ciò è dovuto al fatto che la media della variabile è ragionevolmente vicina al centro dell'intervallo.
+Per quanto riguarda il centrosinistra, si nota un andamento sostanzialmente opposto, come d'altro canto è naturale
+considerando che le due coalizioni assieme raccolgono quasi il 90% dei consensi nazionali.
 """
 
+
+"""
+## Il comune medio
+
+Come voterebbe, mediamente, un comune di una certa regione, fissando numero di elettori, percentuale di
+elettori maschi e affluenza? Modificando i valori a piacere, si può vedere come cambia la ripartizione dei voti.
+Da un'idea del [NYTimes](https://www.nytimes.com/interactive/2019/08/08/opinion/sunday/party-polarization-quiz.html),
+rielaborata secondo i (pochi) dati a disposizione.
+
+"""
+regione = st.selectbox("Regione", ["ITALIA"] + regioni, key="mod_elettori")
+elettori = st.number_input("Numero di elettori del comune", min_value=200, max_value=2000000, value=100000, key="mod_reg")
+m_perc = st.number_input("Percentuale di elettori maschi nel comune", min_value=0, max_value=100, value=50, key="mod_m")
+affluenza = st.number_input("Affluenza registrata nel comune", min_value=0, max_value=100, value=50, key="mod_affl")
+st.altair_chart(mod.prediction(regione, elettori, m_perc, affluenza), use_container_width=True)
+"""
+__Nota metodologica:__ L'idea di base sarebbe stata quella di modellare l'elettore medio in base alle sue caratteristiche.
+Tale analisi sarebbe possibile avendo a disposizione i valori di un campione di elettori.
+Tuttavia, per i dati a disposizione, in cui l'unità statistica è il singolo comune, questo non è realizzabile se non
+facendo assunzioni piuttosto irrealistiche. 
+
+Ricorrendo al metodo di stima _GLS_, le assunzioni fatte dal modello sono piuttosto deboli.
+Sotto l'ipotesi di normalità, che come si è visto appare ragionevole, le tre esplicative appaiono globalmente 
+significative, con p-values estremamente piccoli.
+Il modello non ammette interazione tra le variabili esplicative, dunque l'effetto, ad esempio, dell'aumento di un punto 
+dell'affluenza è considerato costante qualsiasi sia il valore assunto dalle altre esplicative.
+"""
+# Il modello assume distribuzione normale per lo share dei voti dei partiti, che, come si è visto, appare ragionevole.
+# Inoltre, assume omoschedasticità (giustificata dalla trasformazione logaritmica dell'esplicativa _ELETTORI_) e
+# incorrelazione tra un comune e l'altro.
 ### Mappe
 """
 ## Mappe dei risultati
@@ -192,7 +250,7 @@ else:
     st.write(votiCoordFilter.drop(["latitude", "longitude"]))
 
 """
-__Nota metodologica__: Questa mappa è stata realizzata tramite un _inner join_ tra i dati dei risultati 
+__Nota metodologica:__ Questa mappa è stata realizzata tramite un _inner join_ tra i dati dei risultati 
 elettorali e di un database contenente i valori di latitudine e longitudine di (quasi) tutti i comuni italiani. 
 Come è naturale, questo ha comportato una perdita di informazioni dovuta a qualche differenza nei nomi 
 come indicati nelle due tabelle. Si sono apportate alcune correzioni di base (e.g. accenti, omonimie) 

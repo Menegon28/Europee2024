@@ -55,6 +55,27 @@ def data_preprocessing():
     return abs, perc
 
 
+def voti_grouped_by(livello, cond=None):
+    if livello == "ITALIA":
+        votiAbsGrouped = (
+            votiAbs
+            .sum()
+        )
+    else:
+        votiAbsGrouped = (
+            votiAbs
+            .filter(pl.col(livello) == cond)
+            .group_by(livello)
+            .sum()
+        )
+
+    df = votiAbsGrouped.select(["CIRCOSCRIZIONE", "REGIONE", "PROVINCIA", "COMUNE"])
+    for partito in partiti:
+        df = df.with_columns(
+            [(votiAbsGrouped.get_column(partito) / votiAbsGrouped.get_column("VOTI_VALIDI") * 100).round(2).alias(partito)]  # da risolvere la questione round()
+        )
+    return df
+
 partiti = [
     "FRATELLI D'ITALIA",
     "PARTITO DEMOCRATICO",
@@ -86,7 +107,7 @@ partitiPlot = [
     "STATI UNITI D'EUROPA",
     "AZIONE - SIAMO EUROPEI"
 ]
-
+colors = ["blue","red","yellow","lightblue","darkgreen","lightgreen","purple","darkblue"]
 # dati iniziali già preprocessati
 votiAbs, votiPerc = data_preprocessing()
 
@@ -99,3 +120,4 @@ if __name__ == "__main__":
     print(votiPerc)
     print(votiPerc["PARTITO DEMOCRATICO"])
     get_raw_data().glimpse()
+    print(votiAbs.select(["ELETTORI", "ELETTORI_M"]).mean())
