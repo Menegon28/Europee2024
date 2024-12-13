@@ -54,28 +54,43 @@ def data_preprocessing():
     )
     return abs, perc
 
-
+# restituisce un dataframe polars contenente le percentuali di voto di tutti i partiti per un certo livello geografico
+# (italia, circorscizione, regione, provincia o comune)
+# se specificata la condizione cond, restituisce solo quel circ/reg/prov/comune
 def voti_grouped_by(livello, cond=None):
     if livello == "ITALIA":
-        votiAbsGrouped = (
-            votiAbs
-            .sum()
-        )
+        abs_gr = votiAbs.sum()
+        # return votiAbs.sum()
     else:
-        votiAbsGrouped = (
-            votiAbs
-            .filter(pl.col(livello) == cond)
-            .group_by(livello)
+        abs_gr = (
+            get_raw_data()
+            .select(
+                ["CIRCOSCRIZIONE", "REGIONE", "PROVINCIA", "COMUNE", "LISTA", "NUMVOTI"]
+            )
+            .group_by([livello, "LISTA"])
             .sum()
+            .pivot(
+                on="LISTA",
+                values="NUMVOTI"
+            )
+            .with_columns(
+                VOTI_VALIDI=pl.sum_horizontal(partiti)
+            )
         )
 
-    df = votiAbsGrouped.select(["CIRCOSCRIZIONE", "REGIONE", "PROVINCIA", "COMUNE"])
+    perc_gr = abs_gr.select(["CIRCOSCRIZIONE", "REGIONE", "PROVINCIA", "COMUNE"])
     for partito in partiti:
-        df = df.with_columns(
-            [(votiAbsGrouped.get_column(partito) / votiAbsGrouped.get_column("VOTI_VALIDI") * 100).round(2).alias(partito)]  # da risolvere la questione round()
+        perc_gr = perc_gr.with_columns(
+            (abs_gr.get_column(partito) / abs_gr.get_column("VOTI_VALIDI") * 100).round(2).alias(partito)
         )
-    return df
 
+    if livello == "ITALIA" or cond is None:
+        return perc_gr
+    else:
+        return perc_gr.filter(pl.col(livello) == cond)
+
+
+# scriviamo a mano per tenere questo preciso ordine
 partiti = [
     "FRATELLI D'ITALIA",
     "PARTITO DEMOCRATICO",
@@ -107,7 +122,9 @@ partitiPlot = [
     "STATI UNITI D'EUROPA",
     "AZIONE - SIAMO EUROPEI"
 ]
-colors = ["blue","red","yellow","lightblue","darkgreen","lightgreen","purple","darkblue"]
+
+# colors = ["blue","red","yellow","lightblue","darkgreen","lightgreen","purple","darkblue"]
+colors = ["#1f77b4","#d62728","#e7ba52","#aec7e8","#2ca02c","#98df8a","#9467bd","#393b79"]
 # dati iniziali già preprocessati
 votiAbs, votiPerc = data_preprocessing()
 

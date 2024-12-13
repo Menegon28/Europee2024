@@ -22,7 +22,8 @@ Scaricando i dati, otteniamo inizialmente una tabella che appare nel formato seg
 """
 st.dataframe(vt.get_raw_data().head(4))
 """
-In questo formato i dati non sono _tidy_. Infatti, vogliamo che l'unità statistica sia il singolo comune
+In questo formato i dati non sono _tidy_. Infatti, le caratteristiche del comune sono ripetute tante volte
+quante il numero di liste candidate. Vogliamo, invece, che l'unità statistica sia il singolo comune
 e il numero di voti di ogni lista sia ognuno una variabile. Pertanto, effettiamo un pivot sulla colonna
 _LISTA_ e apportiamo altre piccole modifiche. In questo modo, il dataframe risulta organizzato come
 """
@@ -75,7 +76,7 @@ else:
             else:
                 votiPercDf = vt.votiPerc.filter(pl.col("COMUNE") == df_com)
 
-votiPercDf = (
+votiPercPlot = (
     votiPercDf
     .unpivot(
         on=vt.partiti,
@@ -88,15 +89,28 @@ votiPercDf = (
 )
 
 bar_chart = (
-    alt.Chart(votiPercDf)
+    alt.Chart(votiPercPlot)
     .mark_bar()
     .encode(
-        alt.X("PERC"),
-        alt.Y("LISTA", sort="-x")
+        alt.X("PERC:Q"),
+        alt.Y("LISTA:N", sort="-x")
     )
 )
 
-st.altair_chart(bar_chart, use_container_width=True)
+text_bar = (
+    bar_chart
+    .mark_text(
+        align="left",
+        baseline="middle",
+        dx=3
+    )
+    .encode(
+        text="PERC:Q"
+    )
+
+)
+
+st.altair_chart(bar_chart + text_bar, use_container_width=True)
 st.write("### Ridgeline plot")
 regioni = sorted(vt.votiPerc.get_column("REGIONE").unique().to_list())
 partitoDistr = st.selectbox("Ripartizione geografica", ["ITALIA"] + regioni, key="distr")
@@ -134,7 +148,7 @@ distrChart = (
         alt.Y("density:Q", title=None, axis=None, scale=alt.Scale(domain=[0, 0.3])),
         alt.Row("LISTA:N", title=None, sort=vt.partitiPlot, header=alt.Header(labelAngle=0, labelAlign="left")),
         # alt.Facet("LISTA:N", title=None, sort=vt.partitiPlot, header=alt.Header(labelAlign='left')),
-        alt.Color("LISTA:N", scale=alt.Scale(domain=vt.partitiPlot,range=vt.colors))  # legend=alt.Legend(orient="none", legendX=720)
+        alt.Color("LISTA:N", scale=alt.Scale(domain=vt.partitiPlot,range=vt.colors),legend=None)
     ).properties(
         height=75,
         bounds="flush"
@@ -162,16 +176,8 @@ Analizziamo il rapporto tra alcune variabili e la percentuale di voto partito pe
 # slider per gli scatterplot
 partitoPop = st.selectbox("Partito di cui mostrare i grafici:", vt.partiti_ext, key="scatter")
 
-# aggiungiamo una colonna log(ELETTORI) per usarla come esplicativa di un modello lineare
-votiPercPlot = vt.votiPerc.with_columns(
-    logELETTORI=pl.col("ELETTORI").log(),
-    M_PERC=pl.col("ELETTORI_M") / pl.col("ELETTORI") * 100
-)
-
-
-
 st.write("### Scatterplot log(numero di elettori) - share di voto")
-mod.make_model_graph("ELETTORI", True, False,f"% di {partitoPop.title()}", partitoPop)
+mod.make_model_graph("ELETTORI", True, False,f"Numero di elettori nel comune", partitoPop)
 st.write("### Scatterplot percentuale di elettori maschi - share di voto")
 mod.make_model_graph("M_PERC", False, True,"Percentuale di elettori maschi", partitoPop)
 st.write("### Scatterplot affluenza - share di voto")
@@ -180,9 +186,9 @@ mod.make_model_graph("AFFLUENZA", False, True, "Affluenza percentuale", partitoP
 """
 In generale, notiamo che i partiti di centrodestra ottengono risultati migliori nei comuni meno popolosi, 
 con percentuali di elettori maschi alte e affluenza alta. I trend di Fratelli d'Italia e Lega si assomigliano abbastanza,
-mentre quello di Forza Italia non segue l'andamento del resto della coalizione. In particolare, la grandezza
+mentre quello di Forza Italia non segue l'andamento del resto della coalizione. Per questi ultimi, in particolare, la grandezza
 del comune non appare significativa, e i trend per le altre due esplicative vanno in direzione opposta (benché debolmente)
-a quanto visto per Lega e FdI. Si potrebbe ipotizzare che tale comportamento sia dovuto al fatto che Forza Italia, seguendo
+rispetto a quanto visto per Lega e FdI. Si potrebbe ipotizzare che tale comportamento sia dovuto al fatto che Forza Italia, seguendo
 politiche più centriste, faccia riferimento ad un elettorato con caratteristiche diverse.
 
 Per quanto riguarda il centrosinistra, si nota un andamento sostanzialmente opposto, come d'altro canto è naturale
@@ -264,28 +270,19 @@ chLiv = st.selectbox("Livello", ["REGIONE", "PROVINCIA"], key="chLivello")
 # mismatch dei nomi tra i due dataframe renderebbe molti comuni non visualizzati
 chPart = st.selectbox("Partito", vt.partiti, key="chPartito").replace("'", "\\'")
 
-# per ottenere le percentuali per regione/provincia, dobbiamo tornare ai valori assoluti
-# (la percentuale media non è la media delle percentuali dei comuni)
-votiAbsGrouped = (
-    vt.votiAbs
+# raggruppiamo al livello richiesto
+votiPercPlot = (
+    vt.voti_grouped_by(chLiv)
     .with_columns(
         pl.col(chLiv).str.to_titlecase()
     )
-    .group_by(chLiv)
-    .sum()
 )
-
-votiPercPlot = votiAbsGrouped.select(["REGIONE", "PROVINCIA"])
-for partito in vt.partiti:
-    votiPercPlot = votiPercPlot.with_columns(
-        [(votiAbsGrouped.get_column(partito) / votiAbsGrouped.get_column("VOTI_VALIDI") * 100).round(2).alias(partito)]  # da risolvere la questione round()
-    )
 
 # alcune provincie hanno nomi non coincidenti nei due dataframe, modifichiamo per semplicità quelli in votiPercPlot
 votiPercPlot = mappe.reg_prov_fix(votiPercPlot)
 
 geoIT, labelLiv = mappe.get_topo_data(chLiv)
-# st.dataframe(votiPercPlot)
+
 choropleth = (
     alt.Chart(geoIT)
     .mark_geoshape()
@@ -294,7 +291,7 @@ choropleth = (
         from_=alt.LookupData(data=votiPercPlot, key=chLiv, fields=[chPart])
     )
     .encode(
-        alt.Color(f"{chPart}:Q"),
+        alt.Color(f"{chPart}:Q", sort="descending").scale(scheme="viridis"),
         tooltip=[
             alt.Tooltip(f"{labelLiv}:N", title=chLiv),
             alt.Tooltip(f"{chPart}:Q", title=f"% {chPart}", format=".2f")
