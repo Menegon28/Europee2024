@@ -45,7 +45,7 @@ def data_preprocessing():
     # crea il dataframe votiPerc aggiungendo alle colonne delle caratteristiche dei comuni le percentuali di ogni partito
     for partito in partiti:
         perc = perc.with_columns(
-            [(abs[partito] / abs["VOTI_VALIDI"] * 100).round(2).alias(partito)]  # da risolvere la questione round()
+            (abs[partito] / abs["VOTI_VALIDI"] * 100).round(2).alias(partito)  # da risolvere la questione round()
         )  # da rivedere rounding
     perc = perc.with_columns(
         CENTRODESTRA=pl.col("FRATELLI D'ITALIA") + pl.col("LEGA SALVINI PREMIER") + pl.col("FORZA ITALIA - NOI MODERATI - PPE"),
