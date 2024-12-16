@@ -6,7 +6,7 @@ from voti_tidy import votiPerc
 
 @st.cache_data
 def coord_preprocessing():
-    cities = pl.read_csv("cities_coord_original.csv")
+    cities = pl.read_csv("cities_coord.csv")
 
     processed = cities.with_columns(
         pl.col("name")
@@ -30,15 +30,12 @@ def coord_preprocessing():
         .str.replace("San Remo", "Sanremo")
 
     )
-    # with pl.Config(tbl_rows=50):
-    #     print(processed.select("name"))
-    # processed.write_csv("cities_coord_prepr.csv")
+
     return processed
 
 
 @st.cache_data
 def get_coord(_data):
-    # cities = pl.read_csv("cities_coord_prepr.csv")
 
     coord = (_data.select(["name", "location"])
              .with_columns(
@@ -49,9 +46,7 @@ def get_coord(_data):
         .unique(subset="name", keep="none")
         .sort("name"))
     pl.Config(tbl_rows=50)
-    # per trovare i comuni mancanti più popolosi (e contarli)
-    # print(votiPerc.join(coord, left_on="COMUNE", right_on="name", how="anti")
-    #       .select(["COMUNE", "ELETTORI"]).sort("ELETTORI", descending=True))
+
     return votiPerc.join(coord, left_on="COMUNE", right_on="name")
 
 
@@ -68,6 +63,7 @@ def get_topo_data(livello):
             "provinces")
         label = "properties.prov_name"
     return geo, label
+
 
 def reg_prov_fix(voti):
     voti = (

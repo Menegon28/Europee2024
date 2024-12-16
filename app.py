@@ -345,7 +345,7 @@ ggpairs(X,
         diag = list(continuous = "density"))  # Densità
 ```
 """
-st.image("Images/corr.png")
+st.image("corr.png")
 """
 Vediamo come quasi tutte le correlazioni siano significative. Vista la grande dimensione e l'eterogeneità delle unità 
 statistiche, anche correlazioni intorno allo 0.2 risultano interessanti. Notiamo, ad esempio, che un risultato migliore 
