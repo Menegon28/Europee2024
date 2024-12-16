@@ -59,6 +59,7 @@ def make_model_graph(var: str, log: bool, size: bool, title: str, partito: str):
     )
 
 
+# crea predizione del comune medio e relativo pie plot
 def prediction(reg: str, elett: int, m_perc: float, affl: float):
     if reg == "ITALIA":
         voti_pred = votiModel
@@ -87,7 +88,8 @@ def prediction(reg: str, elett: int, m_perc: float, affl: float):
         .mark_arc()
         .encode(
             alt.Theta("PREVISIONE"),
-            alt.Color("PARTITO", scale=alt.Scale(domain=vt.partitiPlot+["ALTRI"], range=vt.colors+["gray"]))
+            alt.Color("PARTITO", scale=alt.Scale(domain=vt.partitiPlot+["ALTRI"], range=vt.colors+["gray"])),
+            order=alt.Order("PREVISIONE", sort="descending")
         )
     )
     return pie

@@ -1,17 +1,14 @@
 import polars as pl
 import streamlit as st
 import altair as alt
-import statsmodels.api as sm
-import statsmodels.formula.api as smf
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+import numpy as np
 import voti_tidy as vt
 import mappe
 import modelli as mod
 
-# st.write("votiAbs")
-# st.dataframe(vt.votiAbs)
-# st.write("votiPerc")
-# st.dataframe(vt.votiPerc)
-# st.html("markdwon.html")
+
 """
 # Europee 2024 in Italia
 ## Organizzazione del DataFrame
@@ -38,7 +35,30 @@ e il valore 0 che indica che il partito non ha raccolto voti nel comune indicato
 ## Analisi descrittive
 Per prima cosa, vediamo cosa i dati ci dicono sui risultati dei singoli partiti. Questi possono essere esplorati
 a livello nazionale, di circoscrizione, regionale, provinciale o comunale.
+
+Selezionando un comune, verrà anche mostrato il suo "__comune gemello__", ovvero quello in cui i risultati sono stati,
+in percentuale più simili. Due comuni sono detti più simili se la loro distanza euclidea tra i partiti che
+nazionalmente hanno superato il 3% è piccola.
 """
+
+# dato un comune, trova e restituisce il comune con la minor distanza euclidea dei voti dei partiti in vt.partitiPlot
+def find_closer(comune:str):
+    comune_row = vt.votiPerc.filter(pl.col("COMUNE")==comune).row(0)
+    closest = "NESSUNO"
+    min_dist = 100000
+    for row in vt.votiPerc.iter_rows():
+        dist = 0
+        if row[3] != comune:
+            for i in range(7,15):
+                dist += (row[i] - comune_row[i]) ** 2
+            if dist < min_dist:
+                min_dist = dist
+                closest = (row[3], row[2])
+
+    return closest
+
+
+df_com = None  # per evitare che sia non definito nel comune gemello
 circoscrizioni = sorted(vt.votiPerc.get_column("CIRCOSCRIZIONE").unique().to_list())
 df_circ = st.selectbox("Circoscrizione", ["ITALIA"]+circoscrizioni, key="df_circ")
 if df_circ == "ITALIA":
@@ -111,6 +131,10 @@ text_bar = (
 )
 
 st.altair_chart(bar_chart + text_bar, use_container_width=True)
+if df_com  is not None and df_com != "TUTTI":
+    gemello = find_closer(df_com)
+    st.write(f"Il comune gemello è __{gemello[0].title()}__, nella provincia di {gemello[1].title()}")
+
 st.write("### Ridgeline plot")
 regioni = sorted(vt.votiPerc.get_column("REGIONE").unique().to_list())
 partitoDistr = st.selectbox("Ripartizione geografica", ["ITALIA"] + regioni, key="distr")
@@ -296,7 +320,242 @@ choropleth = (
 )
 st.altair_chart(choropleth, use_container_width=True)
 
-# siccome l'esecuzione del file R Markdown richiede un certo tempo, e dati non cambiano non esserndo necessaria
-# interazione con l'utente, assumiamo che sia già stato eseguito e leggiamo direttamente il file di output
-with open("correlations.html", "r", encoding='utf-8') as fp:
-    st.components.v1.html(fp.read(), width=800, height=4000)
+"""
+## Alcune ulteriori analisi, aiutati da R
+
+Di seguito riportiamo delle ulteriori analisi, basate su alcuni concetti del corso di _Analisi dei Dati 
+Multidimensionali_, con uno sguardo più approfondito a livello statistico e meno adatto ad un pubblico generalista.
+Per uniformità, consideriamo solo i partiti che hanno superato il 3% dei consensi nazionali e che erano candidati in 
+tutte le circoscrizioni.
+
+### Analisi delle correlazioni
+
+Per prima cosa, vediamo quanto può dirci l'andamento di un partito sui risultati degli altri. Il seguente grafico è 
+eccessivamente complesso da ricreare in Python e richiede una ventina di secondi per l'elaborazione, dunque
+lo prendiamo in prestito da R.
+```{r}
+europee <- read.csv("VotiPerc_R.csv", header=TRUE)
+X <- europee[,7:14]
+names(X) <- c("FdI","PD","M5S", "FI", "Lega", "AVS", "SUE", "Azione")
+library(GGally)
+library(ggplot2)
+ggpairs(X, 
+        lower = list(continuous = "points"),   # Scatterplots
+        upper = list(continuous = "cor"),     # Correlazioni
+        diag = list(continuous = "density"))  # Densità
+```
+"""
+st.image("Images/corr.png")
+"""
+Vediamo come quasi tutte le correlazioni siano significative. Vista la grande dimensione e l'eterogeneità delle unità 
+statistiche, anche correlazioni intorno allo 0.2 risultano interessanti. Notiamo, ad esempio, che un risultato migliore 
+per Fratelli d'Italia porta a percentuali minori per tutti gli altri partiti tranne la Lega.
+A questo proposito, si può osservare che, mentre Fratelli d'Italia e Lega sono positivamente correlati, la correlazione 
+Forza Italia gli altri due partiti di centrodestra è negativa. Il diverso trend di Forza Italia è consistente con quanto
+visto in precedenza. Inolte, il Partito Democratico risulta positivamente correlato con il Movimento 5 Stelle e debolmente
+anche con Alleanza Verdi e Sinistra. Potrebbe risultare sorprendente, infine, la correlazione positiva tra Movimento 5 Stelle e Forza Italia.
+
+### Analisi delle componenti principali
+
+La [_Principal Component Analysis_](https://en.wikipedia.org/wiki/Principal_component_analysis) (PCA) è un metodo di 
+riduzione della dimensionalità con cui cerchiamo di spiegare la variabilità dei dati tramite un minor numero di variabili
+ dette, appunto, componenti principali.
+
+Utilizzando i dati così come sono otteniamo, aiutandoci con R
+```{r}
+pc_original <- prcomp(X, scale=F, center=F)
+summary(pc_original)
+```
+```
+## Importance of components:
+##                            PC1      PC2     PC3     PC4     PC5     PC6     PC7     PC8
+## Standard deviation     42.5896 10.51303 8.93115 6.69422 5.35687 3.76738 3.46642 2.95531
+## Proportion of Variance  0.8586  0.05232 0.03776 0.02121 0.01358 0.00672 0.00569 0.00413
+## Cumulative Proportion   0.8586  0.91091 0.94866 0.96988 0.98346 0.99018 0.99587 1.00000
+```
+
+Utilizzando i dati centrati ma non riscalati, come il default della funzione _PCA()_ in Python, otteniamo
+"""
+
+votiPCA = vt.votiPerc.select(vt.partitiPlot)
+
+def pca_expl_var(princomp):
+    expl_var = (
+        pl.DataFrame(
+            [
+                princomp.explained_variance_.tolist(),
+                princomp.explained_variance_ratio_.tolist(),
+                np.cumsum(princomp.explained_variance_ratio_).tolist()
+            ],
+            orient="row",
+            schema=["1", "2", "3", "4", "5", "6", "7", "8"]
+        )
+        .with_columns(
+                pl.Series("DESCR", ["VAR SPIEGATA", "PROP VAR SP", "CUM PROP VAR SP"])
+        )
+        .select(
+            ["DESCR", "1", "2", "3", "4", "5", "6", "7", "8"]
+        )
+    )
+    return expl_var
+
+pca = PCA()
+pca_result = pca.fit_transform(votiPCA)
+st.dataframe(pca_expl_var(pca),use_container_width=True)
+
+"""
+Utilizzando, invece, i dati standardizzati facciamo emergere la relazione tra i partiti al netto delle loro percentuali medie.
+"""
+
+pca_std = PCA()
+scaler = StandardScaler()
+scaled = scaler.fit_transform(votiPCA)
+pca_std_res = pca_std.fit_transform(scaled)
+
+eigen_expl = pca_expl_var(pca_std)
+st.dataframe(eigen_expl,use_container_width=True)
+
+eigen_expl = (
+    eigen_expl
+    .unpivot(
+        index="DESCR",
+        variable_name="component"
+    )
+    .filter(
+        pl.col("DESCR") == "VAR SPIEGATA"
+    )
+)
+
+screeplot = (
+    alt.Chart(eigen_expl)
+    .mark_line()
+    .encode(
+        alt.X("component", axis=alt.Axis(labelAngle=0), title="Componente principale"),
+        alt.Y("value", title="Varianza spiegata")
+    )
+)
+
+points = (
+    screeplot
+    .mark_point(size=60)
+    .encode(
+        alt.X("component", axis=alt.Axis(labelAngle=0), title="Componente principale"),
+        alt.Y("value", title="Varianza spiegata")
+    )
+)
+
+st.altair_chart(screeplot+points,use_container_width=True)
+
+"""
+In queste condizioni, vediamo che tre componenti principali da sole spiegano circa il 58% della varianza totale. 
+Per i dati grezzi, invece, due componenti spiegano già il 91%. Ciò è dovuto al fatto che i partiti più piccoli hanno 
+molta meno varianza nei risultati, in termini assoluti, rispetto ai partiti maggiori.
+
+#### Biplot
+"""
+PC12 = pl.DataFrame(pca_std_res).select("column_0","column_1")
+
+biplot = (
+    alt.Chart(PC12)
+    .mark_circle()
+    .encode(
+        alt.X("column_0", axis=alt.Axis(labelAngle=0), scale=alt.Scale(domain=[-12, 12]), title="PC1"),
+        alt.Y("column_1", scale=alt.Scale(domain=[-12, 12]), title="PC2")
+        # mettere tooltip
+    )
+    .properties(
+        width=600,
+        height=600
+    )
+)
+
+arrow_data = pl.DataFrame({
+    "x": [0] * 8,
+    "y": [0] * 8,
+    "x2": pca_std.components_[0, :]*15,
+    "y2": pca_std.components_[1, :]*15,
+    "x_txt":pca_std.components_[0, :]*16.5,
+    "y_txt":pca_std.components_[1, :]*16.5,
+    "part": ["FdI", "PD", "M5S", "FI", "Lega", "AVS", "SUE", "Azione"]
+})
+
+arrows = (
+    alt.Chart(arrow_data)
+    .mark_rule(
+        color="red",
+        strokeWidth=3
+    )
+    .encode(
+        x = "x",
+        y = "y",
+        x2 = "x2",
+        y2 = "y2"
+    )
+)
+
+
+text_biplot = (
+    alt.Chart(arrow_data)
+    .mark_text(
+    color="red",
+    fontSize=15,
+    fontWeight="bold"
+    )
+    .encode(
+        x = "x_txt",
+        y = "y_txt",
+        text="part"
+    )
+)
+
+st.altair_chart(biplot+arrows+text_biplot, use_container_width=True)
+"""
+I partiti le cui frecce indicano direzioni simili sono positivamente correlati, quelli a 90° sono incorrelati, 
+mentre quelli che indicano direzioni opposte sono correlati negativamente. Il risultato è tuttavia un'approssimazione 
+basata sulle prime due componenti principali, ovvero spiega solo il 43.5% della varianza totale.
+Le conclusioni che si traggono da questo biplot sono simili ma non del tutto analoghe a quelle che si traggono dall'analisi
+della matrice di correlazione. In questo senso, il biplot è un utile strumento per farsi un'idea grafica delle relazioni
+tra le variabili, ma, essendo una riduzione di dimensionalità, comporta una perdita di informazione.
+
+
+### Analisi fattoriale
+
+La [_Factor Analysis_](https://en.wikipedia.org/wiki/Factor_analysis) (FA) è una tecnica di riduzione della dimensionalità
+ simile alla PCA. Tuttavia, si differenza nel fatto che interpreta le p (nel nostro caso 8) variabili osservate come 
+ risultato della realizzazione di m<<p varaibili non osservabili (dette, appunto, fattori).
+
+```{r}
+factanal(X, 4)
+```
+```
+## 
+## Call:
+## factanal(x = X, factors = 4)
+## 
+## Uniquenesses:
+##    FdI     PD    M5S     FI   Lega    AVS    SUE Azione 
+##  0.419  0.005  0.688  0.005  0.678  0.005  0.788  0.898 
+## 
+## Loadings:
+##        Factor1 Factor2 Factor3 Factor4
+## FdI    -0.285  -0.345  -0.298  -0.540 
+## PD      0.979  -0.186                 
+## M5S     0.165   0.127           0.517 
+## FI              0.986  -0.110         
+## Lega   -0.419  -0.194  -0.237  -0.229 
+## AVS            -0.124   0.988         
+## SUE                             0.456 
+## Azione -0.109  -0.147           0.256 
+## 
+##                Factor1 Factor2 Factor3 Factor4
+## SS loadings      1.268   1.217   1.143   0.885
+## Proportion Var   0.158   0.152   0.143   0.111
+## Cumulative Var   0.158   0.311   0.454   0.564
+## 
+## Test of the hypothesis that 4 factors are sufficient.
+## The chi square statistic is 2822.55 on 2 degrees of freedom.
+## The p-value is 0
+```
+Ci si potrebbe perdere nell'interpretazione dei fattori, ma il test sulla bontà di questa riduzione di dimensionalità 
+ha p-value indistinguibile da 0. Pertanto, l'analisi dei fattori non si presta bene a questo dataset.
+"""
