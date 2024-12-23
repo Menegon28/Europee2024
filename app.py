@@ -36,6 +36,7 @@ e il valore 0 che indica che il partito non ha raccolto voti nel comune indicato
 Per prima cosa, vediamo cosa i dati ci dicono sui risultati dei singoli partiti. Questi possono essere esplorati
 a livello nazionale, di circoscrizione, regionale, provinciale o comunale.
 
+### Esplorare il dataset
 Selezionando un comune, verrà anche mostrato il suo "__comune gemello__", ovvero quello in cui i risultati sono stati,
 in percentuale più simili. Due comuni sono detti più simili se la loro distanza euclidea tra i partiti che
 nazionalmente hanno superato il 3% è piccola.
@@ -195,7 +196,8 @@ a gaussiana delle distribuzioni.
 """
 ## Alcune ipotesi di ricerca
 
-Analizziamo il rapporto tra alcune variabili e la percentuale di voto partito per parito
+Analizziamo il rapporto tra alcune variabili e la percentuale di voto partito per parito.
+Qui e nel seguito, l'opzione _centrodestra_ si riferisce a FdI, Lega e FI, mentre _centrosinistra_ a PD, M5S e AVS.
 """
 # slider per gli scatterplot
 partitoPop = st.selectbox("Partito di cui mostrare i grafici:", vt.partiti_ext, key="scatter")
@@ -217,10 +219,22 @@ politiche più centriste, faccia riferimento ad un elettorato con caratteristich
 
 Per quanto riguarda il centrosinistra, si nota un andamento sostanzialmente opposto, come d'altro canto è naturale
 considerando che le due coalizioni assieme raccolgono quasi il 90% dei consensi nazionali.
-"""
 
+### Il modello completo
+Con le variabili esplicative, il modello completo risulta
 """
-## Il comune medio
+partitoModel = st.selectbox("Partito di cui visualizzare il modello completo:", vt.partitiPlot, key="compl_model")
+st.write(mod.make_compl_model(partitoModel).summary())
+"""
+Il warning visualizzato non è rilevante ai nostri fini. Molti p-values sono vicini a 0, indicando che le variabili
+considerate sono significative globalmente. Per alcuni partiti, alcune esplicative non risultano significative,
+tuttavia non è opportuno modificare l'insieme delle esplicative tra un partito e l'altro. Tuttavia, gli $R^2$ sono piuttosto
+piccoli, in quanto le tre variabili considerate, per quanto significative, spiegano da sole molto poco. È evidente, infatti,
+che i risultati di un partito in un comune dipendano da molti fattori qui non misurati, come posizione geografica,
+risultati delle scorse elezioni, distribuzione delle età, eccetera. Avendo a disposizione ulteriori dati su cui lavorare,
+l'ampiamento di questo modello risulterebbe agevole.
+
+### Il comune medio
 
 Come voterebbe, mediamente, un comune di una certa regione, fissando numero di elettori, percentuale di
 elettori maschi e affluenza? Modificando i valori a piacere, si può vedere come cambia la ripartizione dei voti.
@@ -239,86 +253,15 @@ Tale analisi sarebbe possibile avendo a disposizione i valori di un campione di 
 Tuttavia, per i dati a disposizione, in cui l'unità statistica è il singolo comune, questo non è realizzabile se non
 facendo assunzioni piuttosto irrealistiche. 
 
-Ricorrendo al metodo di stima _GLS_, le assunzioni fatte dal modello sono piuttosto deboli.
-Sotto l'ipotesi di normalità, che come si è visto appare ragionevole, le tre esplicative appaiono globalmente 
-significative, con p-values estremamente piccoli.
+Ricorrendo al metodo di stima [_Quantile regression_](https://en.wikipedia.org/wiki/Quantile_regression), 
+le assunzioni fatte dal modello sono piuttosto deboli.
+In pratica, questo metodo permette di assumere solamente linearità nella relazione tra le esplicative e la risposta,
+con una buona robustezza agli outliers, dovuta al fatto che stiamo stimando la mediana e non la media.
+Le tre esplicative appaiono globalmente significative, con p-values approssimati estremamente piccoli. 
+Questo risultato può essere ottenuto anche senza assumere normalità vista l'alta numerosità del campione.
 Il modello non ammette interazione tra le variabili esplicative, dunque l'effetto, ad esempio, dell'aumento di un punto 
 dell'affluenza è considerato costante qualsiasi sia il valore assunto dalle altre esplicative.
 """
-
-"""
-## Mappe dei risultati
-Dall'interfaccia, selezionare un __partito__ e un __intervallo della percentuale di voti__. 
-Si ottiene così una mappa che indica tutti i comuni in cui il paritito selezionato ha ottenuto una percentuale 
-di voti compatibile con l'intervallo selezionato. È anche possibile visualizzare l'elenco di questi comuni in calce.
-"""
-
-# permettiamo all'utente di filtrare il dataframe
-partitoMappa = st.selectbox("Partito", vt.partiti_ext, key="mappa")
-minPerc, maxPerc = st.slider("Seleziona l'intevallo percentuale", 0, 100, value=(0, 100))
-
-votiCoordFilter = (
-    mappe.votiCoord
-    .drop(["CIRCOSCRIZIONE", "ELETTORI_M"])
-    .filter(pl.col(partitoMappa) >= minPerc)
-    .filter(pl.col(partitoMappa) <= maxPerc)
-    .sort(["REGIONE", "PROVINCIA", "COMUNE"])
-)
-
-# preventiamo che venga sollevata una eccezione nel tentativo di creare una mappa da un dataframe vuoto
-if votiCoordFilter.is_empty():
-    st.write("Nessun comune corrispondente alla descrizione")
-else:
-    st.map(votiCoordFilter,
-           latitude="latitude",
-           longitude="longitude")
-    st.write("Comuni corrispondenti e percentuale dei voto per partito")
-    st.write(votiCoordFilter.drop(["latitude", "longitude"]))
-
-"""
-__Nota metodologica:__ Questa mappa è stata realizzata tramite un _inner join_ tra i dati dei risultati 
-elettorali e di un database contenente i valori di latitudine e longitudine di (quasi) tutti i comuni italiani. 
-Come è naturale, questo ha comportato una perdita di informazioni dovuta a qualche differenza nei nomi 
-come indicati nelle due tabelle. Si sono apportate alcune correzioni di base (e.g. accenti, omonimie) 
-e si è proceduto manualmente per alcuni comuni più grandi. Al momento, circa 700 comuni non sono riportati, 
-(quasi) tutti al di sotto dei 30 mila elettori totali. Alcuni rari casi di omonimia permangono e potrebbero causare 
-la visualizzazione di qualche punto anomalo.
-"""
-
-chLiv = st.selectbox("Livello", ["REGIONE", "PROVINCIA"], key="chLivello")
-# il livello comune è tralasciato sia perché supera i 5000 elementi di limite di default di Altair, sia perché il
-# mismatch dei nomi tra i due dataframe renderebbe molti comuni non visualizzati
-chPart = st.selectbox("Partito", vt.partiti, key="chPartito").replace("'", "\\'")
-
-# raggruppiamo al livello richiesto
-votiPercPlot = (
-    vt.voti_grouped_by(chLiv)
-    .with_columns(
-        pl.col(chLiv).str.to_titlecase()
-    )
-)
-
-# alcune provincie hanno nomi non coincidenti nei due dataframe, modifichiamo per semplicità quelli in votiPercPlot
-votiPercPlot = mappe.reg_prov_fix(votiPercPlot)
-
-geoIT, labelLiv = mappe.get_topo_data(chLiv)
-
-choropleth = (
-    alt.Chart(geoIT)
-    .mark_geoshape()
-    .transform_lookup(
-        lookup=labelLiv,
-        from_=alt.LookupData(data=votiPercPlot, key=chLiv, fields=[chPart])
-    )
-    .encode(
-        alt.Color(f"{chPart}:Q", sort="descending").scale(scheme="viridis"),
-        tooltip=[
-            alt.Tooltip(f"{labelLiv}:N", title=chLiv),
-            alt.Tooltip(f"{chPart}:Q", title=f"% {chPart}", format=".2f")
-        ],
-    )
-)
-st.altair_chart(choropleth, use_container_width=True)
 
 """
 ## Alcune ulteriori analisi, aiutati da R
@@ -374,7 +317,8 @@ summary(pc_original)
 ## Cumulative Proportion   0.8586  0.91091 0.94866 0.96988 0.98346 0.99018 0.99587 1.00000
 ```
 
-Utilizzando i dati centrati ma non riscalati, come il default della funzione _PCA()_ in Python, otteniamo
+Utilizzando i dati centrati ma non riscalati, come il default della funzione _PCA()_ 
+della libreria _scikit-learn_ in Python, otteniamo
 """
 
 votiPCA = vt.votiPerc.select(vt.partitiPlot)
@@ -404,7 +348,8 @@ pca_result = pca.fit_transform(votiPCA)
 st.dataframe(pca_expl_var(pca),use_container_width=True)
 
 """
-Utilizzando, invece, i dati standardizzati facciamo emergere la relazione tra i partiti al netto delle loro percentuali medie.
+Utilizzando, invece, i dati standardizzati facciamo emergere la relazione tra i partiti al netto delle loro percentuali medie
+e delle loro varianze. In pratica, diamo lo stesso peso ad ogni partito. Si ottiene
 """
 
 pca_std = PCA()
@@ -557,5 +502,86 @@ factanal(X, 4)
 ## The p-value is 0
 ```
 Ci si potrebbe perdere nell'interpretazione dei fattori, ma il test sulla bontà di questa riduzione di dimensionalità 
-ha p-value indistinguibile da 0. Pertanto, l'analisi dei fattori non si presta bene a questo dataset.
+ha _p-value_ indistinguibile da 0. Pertanto, l'analisi dei fattori non si presta bene a questo dataset.
 """
+
+"""
+## Mappe dei risultati
+### Una prima mappa con Streamlit
+Dall'interfaccia, selezionare un __partito__ e un __intervallo della percentuale di voti__. 
+Si ottiene così una mappa che indica tutti i comuni in cui il paritito selezionato ha ottenuto una percentuale 
+di voti compatibile con l'intervallo selezionato. È anche possibile visualizzare l'elenco di questi comuni in calce.
+"""
+
+# permettiamo all'utente di filtrare il dataframe
+partitoMappa = st.selectbox("Partito", vt.partiti_ext, key="mappa")
+minPerc, maxPerc = st.slider("Seleziona l'intevallo percentuale", 0, 100, value=(0, 100))
+
+votiCoordFilter = (
+    mappe.votiCoord
+    .drop(["CIRCOSCRIZIONE", "ELETTORI_M"])
+    .filter(pl.col(partitoMappa) >= minPerc)
+    .filter(pl.col(partitoMappa) <= maxPerc)
+    .sort(["REGIONE", "PROVINCIA", "COMUNE"])
+)
+
+# preventiamo che venga sollevata una eccezione nel tentativo di creare una mappa da un dataframe vuoto
+if votiCoordFilter.is_empty():
+    st.write("Nessun comune corrispondente alla descrizione")
+else:
+    st.map(votiCoordFilter,
+           latitude="latitude",
+           longitude="longitude")
+    st.write("Comuni corrispondenti e percentuale dei voto per partito")
+    st.write(votiCoordFilter.drop(["latitude", "longitude"]))
+
+"""
+__Nota metodologica:__ Questa mappa è stata realizzata tramite un _inner join_ tra i dati dei risultati 
+elettorali e di un database contenente i valori di latitudine e longitudine di (quasi) tutti i comuni italiani. 
+Come è naturale, questo ha comportato una perdita di informazioni dovuta a qualche differenza nei nomi 
+come indicati nelle due tabelle. Si sono apportate alcune correzioni di base (e.g. accenti, omonimie) 
+e si è proceduto manualmente per alcuni comuni più grandi. Al momento, circa 700 comuni non sono riportati, 
+(quasi) tutti al di sotto dei 30 mila elettori totali. Alcuni rari casi di omonimia permangono e potrebbero causare 
+la visualizzazione di qualche punto anomalo.
+
+### Risultati per partito, per regione o provincia
+Selezionando un livello si può modificare la visualizzazione tra regione o provincia.
+La scala dei colori visualizzata è relativa al massimo di ogni partito.
+Quando alcune aree geografiche non vengono visualizzate, ciò significa che il partito selezionato non vi era candidato.
+"""
+
+chLiv = st.selectbox("Livello", ["REGIONE", "PROVINCIA"], key="chLivello")
+# il livello comune è tralasciato sia perché supera i 5000 elementi di limite di default di Altair, sia perché il
+# mismatch dei nomi tra i due dataframe renderebbe molti comuni non visualizzati
+chPart = st.selectbox("Partito", vt.partiti, key="chPartito").replace("'", "\\'")
+
+# raggruppiamo al livello richiesto
+votiPercPlot = (
+    vt.voti_grouped_by(chLiv)
+    .with_columns(
+        pl.col(chLiv).str.to_titlecase()
+    )
+)
+
+# alcune provincie hanno nomi non coincidenti nei due dataframe, modifichiamo per semplicità quelli in votiPercPlot
+votiPercPlot = mappe.reg_prov_fix(votiPercPlot)
+
+geoIT, labelLiv = mappe.get_topo_data(chLiv)
+
+choropleth = (
+    alt.Chart(geoIT)
+    .mark_geoshape()
+    .transform_lookup(
+        lookup=labelLiv,
+        from_=alt.LookupData(data=votiPercPlot, key=chLiv, fields=[chPart])
+    )
+    .encode(
+        alt.Color(f"{chPart}:Q", sort="descending").scale(scheme="viridis"),
+        tooltip=[
+            alt.Tooltip(f"{labelLiv}:N", title=chLiv),
+            alt.Tooltip(f"{chPart}:Q", title=f"% {chPart}", format=".2f")
+        ],
+    )
+)
+st.altair_chart(choropleth, use_container_width=True)
+

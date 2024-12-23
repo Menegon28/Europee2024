@@ -6,7 +6,8 @@ import math
 import voti_tidy as vt
 
 votiModel = vt.votiPerc.with_columns(
-    M_PERC=pl.col("ELETTORI_M") / pl.col("ELETTORI") * 100
+    M_PERC=pl.col("ELETTORI_M") / pl.col("ELETTORI") * 100,
+    logELETTORI=pl.col("ELETTORI").log()
 )
 
 # crea lo scatterplot dei punti (var, % voto partito), dove ogni punto è un comune.
@@ -59,6 +60,9 @@ def make_model_graph(var: str, log: bool, size: bool, title: str, partito: str):
     )
 
 
+
+
+
 # crea predizione del comune medio e relativo pie plot
 def prediction(reg: str, elett: int, m_perc: float, affl: float):
     if reg == "ITALIA":
@@ -71,7 +75,7 @@ def prediction(reg: str, elett: int, m_perc: float, affl: float):
         partito = vt.partiti[i]
         vote_share = voti_pred.get_column(partito).to_list()
         espl = sm.add_constant(voti_pred.select(["logELETTORI", "M_PERC", "AFFLUENZA"]))
-        mod_compl = sm.OLS(vote_share, espl).fit()
+        mod_compl = sm.QuantReg(vote_share, espl).fit()
         beta = mod_compl.params
 
         pred.append(round(beta[0] + beta[1] * math.log(elett) + beta[2] * m_perc + beta[3] * affl, 2))
@@ -93,3 +97,10 @@ def prediction(reg: str, elett: int, m_perc: float, affl: float):
         )
     )
     return pie
+
+
+def make_compl_model(partito: str):
+    vote_share = votiModel.get_column(partito).to_list()
+    espl = sm.add_constant(votiModel.select(["logELETTORI", "M_PERC", "AFFLUENZA"]).to_pandas())
+    mod_compl = sm.QuantReg(vote_share, espl).fit()
+    return mod_compl

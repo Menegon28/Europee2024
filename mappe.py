@@ -1,9 +1,12 @@
 import polars as pl
 import altair as alt
 import streamlit as st
-from voti_tidy import votiPerc
+import voti_tidy as vt
 
+### Per mappa streamlit
 
+# effettua il preprocessing sul file contente le coordinate dei comuni italiani, correggendo accenti e alcune città
+# più grandi, in modo da rendere i dati compatibili a quelli contenuti nel DataFrame dei risultati (vt.votiPerc)
 @st.cache_data
 def coord_preprocessing():
     cities = pl.read_csv("cities_coord.csv")
@@ -33,23 +36,27 @@ def coord_preprocessing():
 
     return processed
 
-
+# estrae nome e coordinate dai dati preprocessati e aggiunge a votiPerc tramite inner join
 @st.cache_data
-def get_coord(_data):
+def get_coord(_data, _df):
 
-    coord = (_data.select(["name", "location"])
-             .with_columns(
-        pl.col("location").str.json_decode(),
-        pl.col("name").str.to_uppercase()
-        ).unnest("location")
+    coord = (
+        _data.select(["name", "location"])
+        .with_columns(
+            pl.col("name").str.to_uppercase(),
+            pl.col("location").str.json_decode()
+        )
+        .unnest("location")
         .drop("__type")
         .unique(subset="name", keep="none")
-        .sort("name"))
-    pl.Config(tbl_rows=50)
+        .sort("name")
+    )
 
-    return votiPerc.join(coord, left_on="COMUNE", right_on="name")
+    return _df.join(coord, left_on="COMUNE", right_on="name")
 
+### Per mappa Altair
 
+# scarica e preprocessa i dati geografici di tutte le regioni/provincie, a seconda del livello
 @st.cache_data
 def get_topo_data(livello):
     if livello == "REGIONE":
@@ -65,6 +72,7 @@ def get_topo_data(livello):
     return geo, label
 
 
+# corregge nomi nel dataframe per renderli compatibili con il DataFrame dei risultati (vt.votiPerc)
 def reg_prov_fix(voti):
     voti = (
         voti
@@ -85,12 +93,6 @@ def reg_prov_fix(voti):
     )
     return voti
 
+# assegnamo a variabile globale per poter riutilizzare comodamente
 dataCoord = coord_preprocessing()
-votiCoord = get_coord(dataCoord)
-
-
-if __name__ == "__main__":
-    pass
-
-
-
+votiCoord = get_coord(dataCoord, vt.votiPerc)
