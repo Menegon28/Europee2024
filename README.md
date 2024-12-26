@@ -1,5 +1,5 @@
-# ProgettoSdE2
-### Analisi dei dati elettorali delle Europee 2024 in Italia, per il corso di Sistemi di Elaborazione 2
+# Europee 2024
+## Una analisi dei dati elettorali delle Europee 2024 in Italia, per il corso di Sistemi di Elaborazione 2
 
 Il progetto intende esplorare il dataset delle elezioni Europee del 2024 in Italia. I dati sono pubblicamente disponibili sul sito [Eligendo](https://elezionistorico.interno.gov.it/eligendo/opendata.php), gestito dal Ministero dell'Interno. Per evitare modifiche ai dati, viene utilizzato direttamente il file `Europee2024.txt`.
 

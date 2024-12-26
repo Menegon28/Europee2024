@@ -136,7 +136,14 @@ if df_com  is not None and df_com != "TUTTI":
     gemello = find_closer(df_com)
     st.write(f"Il comune gemello è __{gemello[0].title()}__, nella provincia di {gemello[1].title()}")
 
-st.write("### Ridgeline plot")
+"""
+### Ridgeline plot
+
+Vediamo come cambia la distribuzione della percentuale dei voti validi raccolta per partito e per regione.
+Come sempre, l'unità statistica è il signolo comune. Si noti che i partiti che hanno raccolto meno preferenze a livello
+nazionale hanno una distribuzione più stretta (ovvero con minor varianza, in termini assoluti) e dunque il picco della
+distribuzione è più alto. Per uniformità, sono riportati solo i partiti che hanno superato il 3% a livello nazionale.
+"""
 regioni = sorted(vt.votiPerc.get_column("REGIONE").unique().to_list())
 partitoDistr = st.selectbox("Ripartizione geografica", ["ITALIA"] + regioni, key="distr")
 
@@ -228,13 +235,14 @@ st.write(mod.make_compl_model(partitoModel).summary())
 """
 Il warning visualizzato non è rilevante ai nostri fini. Molti p-values sono vicini a 0, indicando che le variabili
 considerate sono significative globalmente. Per alcuni partiti, alcune esplicative non risultano significative,
-tuttavia non è opportuno modificare l'insieme delle esplicative tra un partito e l'altro. Tuttavia, gli $R^2$ sono piuttosto
+tuttavia non è opportuno modificare l'insieme delle esplicative tra un partito e l'altro. Gli $R^2$ sono piuttosto
 piccoli, in quanto le tre variabili considerate, per quanto significative, spiegano da sole molto poco. È evidente, infatti,
 che i risultati di un partito in un comune dipendano da molti fattori qui non misurati, come posizione geografica,
-risultati delle scorse elezioni, distribuzione delle età, eccetera. Avendo a disposizione ulteriori dati su cui lavorare,
-l'ampiamento di questo modello risulterebbe agevole.
+risultati delle scorse elezioni, distribuzione delle età, eccetera. Inoltre la variabilità non spiegabile è presumibilmente 
+piuttosto elevata: anche due comuni identici per qualsiasi varaibile rilevabile potrebbero avere risultati ben diversi.
+In ogni caso, avendo a disposizione ulteriori dati su cui lavorare, l'ampiamento di questo modello risulterebbe agevole.
 
-### Il comune medio
+### Il comune medio (anzi, mediano)
 
 Come voterebbe, mediamente, un comune di una certa regione, fissando numero di elettori, percentuale di
 elettori maschi e affluenza? Modificando i valori a piacere, si può vedere come cambia la ripartizione dei voti.
@@ -257,8 +265,6 @@ Ricorrendo al metodo di stima [_Quantile regression_](https://en.wikipedia.org/w
 le assunzioni fatte dal modello sono piuttosto deboli.
 In pratica, questo metodo permette di assumere solamente linearità nella relazione tra le esplicative e la risposta,
 con una buona robustezza agli outliers, dovuta al fatto che stiamo stimando la mediana e non la media.
-Le tre esplicative appaiono globalmente significative, con p-values approssimati estremamente piccoli. 
-Questo risultato può essere ottenuto anche senza assumere normalità vista l'alta numerosità del campione.
 Il modello non ammette interazione tra le variabili esplicative, dunque l'effetto, ad esempio, dell'aumento di un punto 
 dell'affluenza è considerato costante qualsiasi sia il valore assunto dalle altre esplicative.
 """
@@ -585,3 +591,27 @@ choropleth = (
 )
 st.altair_chart(choropleth, use_container_width=True)
 
+"""
+## Conclusioni e commenti
+Il progetto si pone l'obiettivo di esplorare e visualizzare le relazioni che emorgono dai dati a disposizione.
+Come si può vedere, sono emerse correlazioni interessanti sia tra i vari partiti, sia tra i partiti e le tre variabili
+che descrivono il comune. Un proseguimento ovvio di questa analisi potrebbe essere l'aggiunta di ulteriori variabili
+di descrizione del comune. Questo, però, è reso particolarmente complesso dal fatto che i dati non contengono i codici
+ISTAT dei comuni. Ricavarli dal nome del comune è certamente possibile, ma è un processo estremamente lungo che esula 
+dagli scopi di questo progetto e di questo corso.
+
+Tra le relazioni più interessanti emerse, trovo particolamente interessanti quelle del modello. In particolare, che il 
+centrodestra ottiene risultati migliori in comuni meno popolosi, con più maschi e affluenza maggiore, mentre per 
+il centrosinistra vale l'opposto. Inoltre, un fatto evidente in più punti è la forte differenza che intercorre tra Fratelli
+d'Italia e Lega, che mostrano sempre comportamenti simili, e Forza Italia, che spesso mostra andamenti non allineati.
+Inoltre, dalle correlazioni si evidenziano valori positivi tra Partito Democratico, Movimento 5 Stelle e Alleanza
+Verdi Sinistra, mentre non sono così chiari i rapporti di Stati Uniti d'Europa e Azione con gli altri partiti.
+
+Per quanto riguarda il progetto in sé, l'ho trovato una grande opportunità per imparare a usare Python in maniera più
+organizzata e per esplorare diversi modi per affrontare i problemi emersi, oltre ad alcune librerie.
+Mi ha fatto realizzare quanto ci sia un grande livello di complessità nascosta dietro a tutto quello che usiamo e diamo 
+per scontato, dalla singola libreria alle funzioni di R. Molte cose facilmente realizzabili in R hanno richiesto 
+un bel po' di tempo per essere implementate in Python, pur affidando la parte più pesante del lavoro
+a delle librerie apposite. L'esplorazione di questo dataset inoltre mi ha dato molti spunti su cui riflettere in vista
+della tesi che intendo sviluppare su argomenti sempre legati ai dati elettorali.
+"""
