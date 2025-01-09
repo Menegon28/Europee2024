@@ -60,9 +60,6 @@ def make_model_graph(var: str, log: bool, size: bool, title: str, partito: str):
     )
 
 
-
-
-
 # crea predizione del comune medio e relativo pie plot
 def prediction(reg: str, elett: int, m_perc: float, affl: float):
     if reg == "ITALIA":
@@ -99,6 +96,7 @@ def prediction(reg: str, elett: int, m_perc: float, affl: float):
     return pie
 
 
+# adatta e restituisce il modello completo (con le tre esplicative considerate nella discussione)
 def make_compl_model(partito: str):
     vote_share = votiModel.get_column(partito).to_list()
     espl = sm.add_constant(votiModel.select(["logELETTORI", "M_PERC", "AFFLUENZA"]).to_pandas())

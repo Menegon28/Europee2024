@@ -2,14 +2,13 @@ import polars as pl
 import streamlit as st
 from statsmodels.tsa.statespace.tools import prepare_trend_data
 
-
+# legge, modifica i nomi di colonna e restituisce i dati nello stesso formato in cui sono contenuti nel file
 def get_raw_data():
     file = "Europee2024.txt"
     voti = pl.read_csv(file, separator=";")
 
     # togliamo una colonna inutile e rinominiamo per semplificarci la vita
     # questo sarà il dataframe che rappresenta l'linformazione iniziale "raw"
-    # indico il tipo atteso altrimenti pycharm si confonde
     voti: pl.dataframe = (
         voti
         .drop("DATA_ELEZIONE")
@@ -25,6 +24,8 @@ def get_raw_data():
     return voti
 
 
+# effettua il preprocessing, creando un dataset per i voti in valore assoluto e uno per i voti espressi sulla percentuale
+# dei voti validi, dove ogni comune è una unità statistica e i risultati di ogni lista una variabile
 @st.cache_data
 def data_preprocessing():
     voti = get_raw_data()
@@ -45,8 +46,9 @@ def data_preprocessing():
     # crea il dataframe votiPerc aggiungendo alle colonne delle caratteristiche dei comuni le percentuali di ogni partito
     for partito in partiti:
         perc = perc.with_columns(
-            (abs[partito] / abs["VOTI_VALIDI"] * 100).round(2).alias(partito)  # da risolvere la questione round()
-        )  # da rivedere rounding
+            # per una questione di visualizzazione in Streamlit, arrotondiamo tutto alla seconda cifra decimale
+            (abs.get_column(partito) / abs.get_column("VOTI_VALIDI") * 100).round(2).alias(partito)
+        )
     perc = perc.with_columns(
         CENTRODESTRA=pl.col("FRATELLI D'ITALIA") + pl.col("LEGA SALVINI PREMIER") + pl.col("FORZA ITALIA - NOI MODERATI - PPE"),
         CENTROSINISTRA=pl.col("PARTITO DEMOCRATICO") + pl.col("MOVIMENTO 5 STELLE") + pl.col("ALLEANZA VERDI E SINISTRA"),
@@ -137,4 +139,4 @@ if __name__ == "__main__":
     print(votiPerc)
     print(votiPerc["PARTITO DEMOCRATICO"])
     get_raw_data().glimpse()
-    print(votiAbs.select(["ELETTORI", "ELETTORI_M"]).mean())
+    print(votiAbs.select(partiti+["VOTI_VALIDI"]).sum())

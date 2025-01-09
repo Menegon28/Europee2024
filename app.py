@@ -97,6 +97,9 @@ else:
             else:
                 votiPercDf = vt.votiPerc.filter(pl.col("COMUNE") == df_com)
 
+
+# bar chart dei voti percentuali per partito
+# usiamo votiPercPlot come dataframe temporaneo, da manipolare di volta in volta per creare i singoli grafici
 votiPercPlot = (
     votiPercDf
     .unpivot(
@@ -128,7 +131,6 @@ text_bar = (
     .encode(
         text="PERC:Q"
     )
-
 )
 
 st.altair_chart(bar_chart + text_bar, use_container_width=True)
@@ -147,7 +149,6 @@ distribuzione è più alto. Per uniformità, sono riportati solo i partiti che h
 regioni = sorted(vt.votiPerc.get_column("REGIONE").unique().to_list())
 partitoDistr = st.selectbox("Ripartizione geografica", ["ITALIA"] + regioni, key="distr")
 
-# usiamo votiPercPlot come dataframe temporaneo, da manipolare di volta in volta per creare i singoli grafici
 votiPercPlot = (
     vt.votiPerc.select(
         ["REGIONE", "PROVINCIA", "COMUNE"] + vt.partitiPlot
@@ -250,10 +251,12 @@ Da un'idea del [NYTimes](https://www.nytimes.com/interactive/2019/08/08/opinion/
 rielaborata secondo i (pochi) dati a disposizione.
 
 """
+# input dell'utente
 regione = st.selectbox("Regione", ["ITALIA"] + regioni, key="mod_elettori")
 elettori = st.number_input("Numero di elettori del comune", min_value=200, max_value=2000000, value=100000, key="mod_reg")
 m_perc = st.number_input("Percentuale di elettori maschi nel comune", min_value=0, max_value=100, value=50, key="mod_m")
 affluenza = st.number_input("Affluenza registrata nel comune", min_value=0, max_value=100, value=50, key="mod_affl")
+# creazione e visualizzazione della pie chart
 st.altair_chart(mod.prediction(regione, elettori, m_perc, affluenza), use_container_width=True)
 """
 __Nota metodologica:__ L'idea di base sarebbe stata quella di modellare l'elettore medio in base alle sue caratteristiche.
@@ -329,6 +332,8 @@ della libreria _scikit-learn_ in Python, otteniamo
 
 votiPCA = vt.votiPerc.select(vt.partitiPlot)
 
+# data una PCA (sklearn) restituisce un dataframe conentente varianza spiegata (assoluta, in proporzione e cumulativa)
+# da ognuna delle componenti principali
 def pca_expl_var(princomp):
     expl_var = (
         pl.DataFrame(
@@ -349,6 +354,7 @@ def pca_expl_var(princomp):
     )
     return expl_var
 
+# PCA e visualizzazione delle varianze spiegate da ogni PC
 pca = PCA()
 pca_result = pca.fit_transform(votiPCA)
 st.dataframe(pca_expl_var(pca),use_container_width=True)
@@ -357,7 +363,7 @@ st.dataframe(pca_expl_var(pca),use_container_width=True)
 Utilizzando, invece, i dati standardizzati facciamo emergere la relazione tra i partiti al netto delle loro percentuali medie
 e delle loro varianze. In pratica, diamo lo stesso peso ad ogni partito. Si ottiene
 """
-
+# con i dati standardizzati
 pca_std = PCA()
 scaler = StandardScaler()
 scaled = scaler.fit_transform(votiPCA)
@@ -377,6 +383,7 @@ eigen_expl = (
     )
 )
 
+# screeplot
 screeplot = (
     alt.Chart(eigen_expl)
     .mark_line()
@@ -406,6 +413,7 @@ molta meno varianza nei risultati, in termini assoluti, rispetto ai partiti magg
 """
 PC12 = pl.DataFrame(pca_std_res).select("column_0","column_1")
 
+# visualizzazione dei punti (ognuno è un comune)
 biplot = (
     alt.Chart(PC12)
     .mark_circle()
@@ -420,6 +428,7 @@ biplot = (
     )
 )
 
+# definizione e visualizzazione delle frecce (ognuna è un partito)
 arrow_data = pl.DataFrame({
     "x": [0] * 8,
     "y": [0] * 8,
@@ -443,7 +452,6 @@ arrows = (
         y2 = "y2"
     )
 )
-
 
 text_biplot = (
     alt.Chart(arrow_data)
