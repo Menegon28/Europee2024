@@ -38,7 +38,7 @@ a livello nazionale, di circoscrizione, regionale, provinciale o comunale.
 
 ### Esplorare il dataset
 Selezionando un comune, verrà anche mostrato il suo "__comune gemello__", ovvero quello in cui i risultati sono stati,
-in percentuale più simili. Due comuni sono detti più simili se la loro distanza euclidea tra i partiti che
+in percentuale, più simili. Due comuni sono detti simili se la loro distanza euclidea tra i partiti che
 nazionalmente hanno superato il 3% è piccola.
 """
 
@@ -229,7 +229,7 @@ Per quanto riguarda il centrosinistra, si nota un andamento sostanzialmente oppo
 considerando che le due coalizioni assieme raccolgono quasi il 90% dei consensi nazionali.
 
 ### Il modello completo
-Con le variabili esplicative, il modello completo risulta
+Con queste variabili esplicative, il modello completo risulta
 """
 partitoModel = st.selectbox("Partito di cui visualizzare il modello completo:", vt.partitiPlot, key="compl_model")
 st.write(mod.make_compl_model(partitoModel).summary())
@@ -481,7 +481,7 @@ tra le variabili, ma, essendo una riduzione di dimensionalità, comporta una per
 
 La [_Factor Analysis_](https://en.wikipedia.org/wiki/Factor_analysis) (FA) è una tecnica di riduzione della dimensionalità
  simile alla PCA. Tuttavia, si differenza nel fatto che interpreta le p (nel nostro caso 8) variabili osservate come 
- risultato della realizzazione di m<<p varaibili non osservabili (dette, appunto, fattori).
+ risultato della realizzazione di m << p varaibili non osservabili (dette, appunto, fattori).
 
 ```{r}
 factanal(X, 4)
@@ -621,5 +621,5 @@ Mi ha fatto realizzare quanto ci sia un grande livello di complessità nascosta 
 per scontato, dalla singola libreria alle funzioni di R. Molte cose facilmente realizzabili in R hanno richiesto 
 un bel po' di tempo per essere implementate in Python, pur affidando la parte più pesante del lavoro
 a delle librerie apposite. L'esplorazione di questo dataset inoltre mi ha dato molti spunti su cui riflettere in vista
-della tesi che intendo sviluppare su argomenti sempre legati ai dati elettorali.
+della tesi che intendo sviluppare su argomenti sempre legati ai dati elettorali col Prof. Finos.
 """
